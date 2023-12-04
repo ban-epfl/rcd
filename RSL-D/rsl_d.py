@@ -1,13 +1,24 @@
 from typing import List
-
 import networkx as nx
 import numpy as np
 import pandas as pd
-from pgmpy.estimators import CITests
 
-REMOVED_VAR = -1
+"""
+This file contains the implementation of the RSL-D algorithm for learning diamond-free graphs from i.i.d. samples 
+from the variables. The class is initialized with a Pandas DataFrame of data, where the ith column contains samples 
+from the ith variable, and a conditional independence test function, which determines whether two variables are 
+independent given another set of variables, using the data provided. For examples of possible conditional 
+independence tests, see utilities/ci_tests.py. For details on how to write a custom CI test function, look at the 
+constructor (init function) of the RSLDiamondFree class below.
+
+To see an example of how to use the RSL-D algorithm, take a loo at rsl_d_demo.py.
+
+Note that one instance of the RSLDiamondFree class can only be used to learn one skeleton from one set of data. If you
+want to learn multiple skeletons from multiple datasets, you will need to create multiple instances of the class.
+"""
 
 
+# currently unused
 def find_markov_boundary(var_name: str, data: pd.DataFrame, ci_test) -> List[str]:
     """
 
@@ -39,9 +50,12 @@ def find_markov_boundary_matrix(data: pd.DataFrame, ci_test) -> np.ndarray:
 
     num_vars = len(data.columns)
     var_name_set = set(data.columns)
-    markov_boundary_matrix = np.zeros((num_vars, num_vars))
-    for i, var_name in enumerate(data.columns):
-        for j, var_name2 in enumerate(data.columns[i:]):
+    markov_boundary_matrix = np.zeros((num_vars, num_vars), dtype=int)
+
+    for i in range(num_vars - 1):  # -1 because no need to check last variable
+        var_name = data.columns[i]
+        for j in range(i + 1, num_vars):
+            var_name2 = data.columns[j]
             # check whether var_name and var_name2 are independent of each other given the rest of the variables
             cond_set = list(var_name_set - {var_name, var_name2})
             if not ci_test(var_name, var_name2, cond_set, data):
@@ -51,24 +65,37 @@ def find_markov_boundary_matrix(data: pd.DataFrame, ci_test) -> np.ndarray:
     return markov_boundary_matrix
 
 
-class RSL:
+class RSLDiamondFree:
     def __init__(self, data: pd.DataFrame, ci_test):
+        """
+        Initialize the RSL-D algorithm with the data and conditional independence test to use.
+        :param data: Dataframe where each column is a variable
+        :param ci_test: Conditional independence test to use that takes in the names of two variables and a list of
+        variable names as the conditioning set, and returns True if the two variables are independent given the
+        conditioning set, and False otherwise. The signature of the function should be:
+        ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
+        """
         self.num_vars = len(data.columns)
         self.data = data
         self.var_names = data.columns
         self.ci_test = ci_test
-        self.var_name_set = set(data.columns)
-        self.flag_arr = np.zeros(self.num_vars, dtype=bool)
+
+        # we use a flag array to keep track of which variables need to be checked for removal (i.e., we check if true)
+        self.flag_arr = np.ones(self.num_vars, dtype=bool)
         self.var_idx_set = set(range(self.num_vars))
-        self.var_name_idx_dict = {var_name: i for i, var_name in enumerate(data.columns)}
-
         self.markov_boundary_matrix = None
+        self.learned_skeleton = None
 
-    def run_algorithm(self) -> nx.Graph:
+    def has_alg_run(self):
+        return self.learned_skeleton is not None
+
+    def learn_and_get_skeleton(self) -> nx.Graph:
         """
-        Run the RSL algorithm on the data and return the learned skeleton graph
+        Run the RSL algorithm on the data to learn and return the learned skeleton graph
         :return: A networkx graph representing the learned skeleton
         """
+        if self.has_alg_run():
+            return self.learned_skeleton
 
         # initialize graph
         skeleton = nx.Graph()
@@ -94,6 +121,7 @@ class RSL:
             # remove the removable variable from the set of variables left
             var_idx_left_set.remove(removable_var_idx)
 
+        self.learned_skeleton = skeleton
         return skeleton
 
     def find_neighborhood(self, var_idx: int) -> np.ndarray:
@@ -103,28 +131,32 @@ class RSL:
         :return: 1D numpy array containing the indices of the variables in the neighborhood
         """
 
+        var_name = self.var_names[var_idx]
         var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.nonzero(var_mk_arr != REMOVED_VAR)
+        var_mk_idxs = np.flatnonzero(var_mk_arr)
 
         # loop through markov boundary matrix row corresponding to var_name
-        # use Lemma 4 of RSL paper: var2_idx is Y and var3_idx is Z. cond_set is Mb(X) - {Y, Z}
+        # use Lemma 4 of RSL paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) - {Y, Z}
         # at first, assume all variables are neighbors
         neighbors = np.copy(var_mk_arr)
 
-        for var2_idx in var_mk_idxs:
-            for var3_idx in np.arange(var2_idx + 1, len(var_mk_arr)):
-                var2_name = self.var_names[var2_idx]
-                var3_name = self.var_names[var3_idx]
-                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var2_idx, var3_idx}]
+        for mb_idx_y in range(len(var_mk_idxs)):
+            for mb_idx_z in range(len(var_mk_idxs)):
+                if mb_idx_y == mb_idx_z:
+                    continue
+                var_y_idx = var_mk_idxs[mb_idx_y]
+                var_z_idx = var_mk_idxs[mb_idx_z]
+                var_y_name = self.var_names[var_y_idx]
+                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var_y_idx, var_z_idx}]
 
-                if self.ci_test(var2_name, var3_name, cond_set, self.data):
+                if self.ci_test(var_name, var_y_name, cond_set, self.data):
                     # we know that var2 is a co-parent and thus NOT a neighbor
-                    neighbors[var2_idx] = REMOVED_VAR
+                    neighbors[var_y_idx] = 0
                     break
 
         # remove all variables that are not neighbors
-        neighbors = neighbors[neighbors != REMOVED_VAR]
-        return neighbors
+        neighbors_idx_arr = np.flatnonzero(neighbors)
+        return neighbors_idx_arr
 
     def is_removable(self, var_idx: int) -> bool:
         """
@@ -134,17 +166,19 @@ class RSL:
         """
 
         var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.nonzero(var_mk_arr != REMOVED_VAR)
+        var_mk_idxs = np.flatnonzero(var_mk_arr)
 
-        # use Lemma 3 of RSL paper: var2_idx is Y and var3_idx is Z. cond_set is Mb(X) + {X} - {Y, Z}
-        for var2_idx in var_mk_idxs:
-            for var3_idx in np.arange(var2_idx + 1, len(var_mk_arr)):
-                var2_name = self.var_names[var2_idx]
-                var3_name = self.var_names[var3_idx]
-                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var2_idx, var3_idx}] + [
+        # use Lemma 3 of RSL paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) + {X} - {Y, Z}
+        for mb_idx_y in range(len(var_mk_idxs) - 1):  # -1 because no need to check last variable and also symmetry
+            for mb_idx_z in range(mb_idx_y + 1, len(var_mk_idxs)):
+                var_y_idx = var_mk_idxs[mb_idx_y]
+                var_z_idx = var_mk_idxs[mb_idx_z]
+                var_y_name = self.var_names[var_y_idx]
+                var_z_name = self.var_names[var_z_idx]
+                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var_y_idx, var_z_idx}] + [
                     self.var_names[var_idx]]
 
-                if self.ci_test(var2_name, var3_name, cond_set, self.data):
+                if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
                     return False
         return True
 
@@ -157,12 +191,17 @@ class RSL:
 
         # sort variables by the size of their Markov boundary
         mb_size = np.sum(self.markov_boundary_matrix[var_idx_list], axis=1)
-        sorted_var_idx = np.argsort(mb_size)
+        sort_indices = np.argsort(mb_size)
+        sorted_var_idx = np.asarray(var_idx_list, dtype=int)[sort_indices]
 
         for var_idx in sorted_var_idx:
-            if not self.flag_arr[var_idx] and self.is_removable(var_idx):
-                self.flag_arr[var_idx] = False  # TODO ask Ehsan about this and also final return statement
-                return var_idx
+            if self.flag_arr[var_idx]:
+                self.flag_arr[var_idx] = False
+                if self.is_removable(var_idx):
+                    return var_idx
+
+        # if no removable found, return the first variable
+        return sorted_var_idx[0]
 
     def update_markov_boundary_matrix(self, var_idx: int, var_neighbors: np.ndarray):
         """
@@ -171,14 +210,38 @@ class RSL:
         :param var_neighbors: 1D numpy array containing the indices of the neighbors of var_idx
         """
 
-        var_markov_boundary = np.nonzero(self.markov_boundary_matrix[var_idx])
+        var_markov_boundary = np.flatnonzero(self.markov_boundary_matrix[var_idx])
 
         # for every variable in the markov boundary of var_idx, remove it from the markov boundary and update flag
-        for mb_var_idx in np.nonzero(self.markov_boundary_matrix[var_idx] != REMOVED_VAR):  # TODO use indexing instead
-            self.markov_boundary_matrix[mb_var_idx, var_idx] = REMOVED_VAR
-            self.markov_boundary_matrix[var_idx, mb_var_idx] = REMOVED_VAR
+        for mb_var_idx in np.flatnonzero(self.markov_boundary_matrix[var_idx]):  # TODO use indexing instead
+            self.markov_boundary_matrix[mb_var_idx, var_idx] = 0
+            self.markov_boundary_matrix[var_idx, mb_var_idx] = 0
             self.flag_arr[mb_var_idx] = True
 
         if len(var_markov_boundary) > len(var_neighbors):
             # Sufficient condition for diamond-free graphs
             return
+
+        # find nodes whose co-parent status changes
+        # we only remove Y from mkvb of Z iff X is their ONLY common child and they are NOT neighbors)
+        for ne_idx_y in range(len(var_neighbors) - 1):  # -1 because no need to check last variable and also symmetry
+            for ne_idx_z in range(ne_idx_y + 1, len(var_neighbors)):
+                var_y_idx = var_neighbors[ne_idx_y]
+                var_z_idx = var_neighbors[ne_idx_z]
+                var_y_name = self.var_names[var_y_idx]
+                var_z_name = self.var_names[var_z_idx]
+
+                # determine whether the mkbv of var_y_idx or var_z_idx is smaller, and use the smaller one as cond_set
+                var_y_markov_boundary = np.flatnonzero(self.markov_boundary_matrix[var_y_idx])
+                var_z_markov_boundary = np.flatnonzero(self.markov_boundary_matrix[var_z_idx])
+                if np.sum(self.markov_boundary_matrix[var_y_idx]) < np.sum(self.markov_boundary_matrix[var_z_idx]):
+                    cond_set = [self.var_names[idx] for idx in set(var_y_markov_boundary) - {var_z_idx}]
+                else:
+                    cond_set = [self.var_names[idx] for idx in set(var_z_markov_boundary) - {var_y_idx}]
+
+                if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
+                    # we know that Y and Z are co-parents and thus NOT neighbors
+                    self.markov_boundary_matrix[var_y_idx, var_z_idx] = 0
+                    self.markov_boundary_matrix[var_z_idx, var_y_idx] = 0
+                    self.flag_arr[var_y_idx] = True
+                    self.flag_arr[var_z_idx] = True
