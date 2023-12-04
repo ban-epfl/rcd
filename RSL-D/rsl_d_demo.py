@@ -5,7 +5,7 @@ from utilities.utils import f1_score_edges
 
 if __name__ == '__main__':
     """
-    In this example, we first generate an Erdos-Renyi DAG with n=50 nodes and edge probability p=n^{-0.82}. 
+    In this example, we first generate an Erdos-Renyi DAG with n=50 nodes and edge probability p=n^{-0.85}. 
     Notice that by setting p as such, we are guaranteeing with high probability that the generated graph is 
     diamond-free, which is a requirement for RSL-D. Then, we generate 1000 samples per variable from this DAG and run 
     RSL-D on it, comparing the learned skeleton to the true skeleton. We use the Pearson correlation coefficient as 
