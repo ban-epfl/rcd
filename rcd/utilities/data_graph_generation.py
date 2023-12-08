@@ -27,7 +27,6 @@ def gen_er_dag_adj_mat(num_vars: int, edge_prob: float):
 def gen_gaussian_data(dag_adj_mat: np.ndarray, num_samples: int) -> pd.DataFrame:
     """
     Generate random Gaussian samples for each variable from a given DAG
-    TODO: ask Ehsan the exact form of each variable
     :param dag_adj_mat: The adjacency matrix of the DAG
     :param num_samples: Number of samples to generate for each variable
     :return: A pandas dataframe with the generated samples

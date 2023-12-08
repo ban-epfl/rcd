@@ -4,17 +4,15 @@ import numpy as np
 import pandas as pd
 
 """
-This file contains the implementation of the RSL-D algorithm for learning diamond-free graphs from i.i.d. samples 
-from the variables. The class is initialized with a Pandas DataFrame of data, where the ith column contains samples 
-from the ith variable, and a conditional independence test function, which determines whether two variables are 
-independent given another set of variables, using the data provided. For examples of possible conditional 
-independence tests, see utilities/ci_tests.py. For details on how to write a custom CI test function, look at the 
-constructor (init function) of the RSLDiamondFree class below.
+This file contains the base class implementation for the rsl-D and rsl-W algorithms for learning diamond-free 
+graphs and graphs with a bounded clique number from i.i.d. samples. The class is initialized with a conditional 
+independence test function, which determines whether two variables are independent given another set of variables, 
+using the data provided. For examples of possible conditional independence tests, see utilities/ci_tests.py. For 
+details on how to write a custom CI test function, look at the constructor (init function) of the RSLBase class 
+below.
 
-To see an example of how to use the RSL-D algorithm, take a loo at rsl_d_demo.py.
-
-Note that one instance of the RSLDiamondFree class can only be used to learn one skeleton from one set of data. If you
-want to learn multiple skeletons from multiple datasets, you will need to create multiple instances of the class.
+The class has a learn_and_get_skeleton function that takes in a Pandas DataFrame of data, where the ith column
+contains samples from the ith variable, and returns a networkx graph representing the learned skeleton.
 """
 
 
@@ -65,22 +63,31 @@ def find_markov_boundary_matrix(data: pd.DataFrame, ci_test) -> np.ndarray:
     return markov_boundary_matrix
 
 
-class RSLDiamondFree:
-    def __init__(self, data: pd.DataFrame, ci_test):
+class RSLBase:
+    def __init__(self, ci_test):
         """
-        Initialize the RSL-D algorithm with the data and conditional independence test to use.
-        :param data: Dataframe where each column is a variable
+        Initialize the rsl algorithm with the data and conditional independence test to use.
         :param ci_test: Conditional independence test to use that takes in the names of two variables and a list of
         variable names as the conditioning set, and returns True if the two variables are independent given the
         conditioning set, and False otherwise. The signature of the function should be:
         ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
         """
-        self.num_vars = len(data.columns)
-        self.data = data
-        self.var_names = data.columns
+        self.num_vars = None
+        self.data = None
+        self.var_names = None
         self.ci_test = ci_test
 
         # we use a flag array to keep track of which variables need to be checked for removal (i.e., we check if true)
+        self.flag_arr = None
+        self.var_idx_set = None
+        self.markov_boundary_matrix = None
+        self.learned_skeleton = None
+
+    def reset_fields(self, data: pd.DataFrame):
+        self.num_vars = len(data.columns)
+        self.data = data
+        self.var_names = data.columns
+
         self.flag_arr = np.ones(self.num_vars, dtype=bool)
         self.var_idx_set = set(range(self.num_vars))
         self.markov_boundary_matrix = None
@@ -89,13 +96,12 @@ class RSLDiamondFree:
     def has_alg_run(self):
         return self.learned_skeleton is not None
 
-    def learn_and_get_skeleton(self) -> nx.Graph:
+    def learn_and_get_skeleton(self, data: pd.DataFrame) -> nx.Graph:
         """
-        Run the RSL algorithm on the data to learn and return the learned skeleton graph
+        Run the rsl algorithm on the data to learn and return the learned skeleton graph
         :return: A networkx graph representing the learned skeleton
         """
-        if self.has_alg_run():
-            return self.learned_skeleton
+        self.reset_fields(data)
 
         # initialize graph
         skeleton = nx.Graph()
@@ -126,61 +132,21 @@ class RSLDiamondFree:
 
     def find_neighborhood(self, var_idx: int) -> np.ndarray:
         """
-        Find the neighborhood of a variable using Lemma 4 of the RSL paper.
+        Find the neighborhood of a variable using Lemma 4 of the rsl paper.
         :param var_idx: Index of the variable in the data
         :return: 1D numpy array containing the indices of the variables in the neighborhood
         """
 
-        var_name = self.var_names[var_idx]
-        var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.flatnonzero(var_mk_arr)
-
-        # loop through markov boundary matrix row corresponding to var_name
-        # use Lemma 4 of RSL paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) - {Y, Z}
-        # at first, assume all variables are neighbors
-        neighbors = np.copy(var_mk_arr)
-
-        for mb_idx_y in range(len(var_mk_idxs)):
-            for mb_idx_z in range(len(var_mk_idxs)):
-                if mb_idx_y == mb_idx_z:
-                    continue
-                var_y_idx = var_mk_idxs[mb_idx_y]
-                var_z_idx = var_mk_idxs[mb_idx_z]
-                var_y_name = self.var_names[var_y_idx]
-                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var_y_idx, var_z_idx}]
-
-                if self.ci_test(var_name, var_y_name, cond_set, self.data):
-                    # we know that var2 is a co-parent and thus NOT a neighbor
-                    neighbors[var_y_idx] = 0
-                    break
-
-        # remove all variables that are not neighbors
-        neighbors_idx_arr = np.flatnonzero(neighbors)
-        return neighbors_idx_arr
+        raise NotImplementedError()
 
     def is_removable(self, var_idx: int) -> bool:
         """
-        Check whether a variable is removable using Lemma 3 of the RSL paper.
+        Check whether a variable is removable using Lemma 3 of the rsl paper.
         :param var_idx:
         :return: True if the variable is removable, False otherwise
         """
 
-        var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.flatnonzero(var_mk_arr)
-
-        # use Lemma 3 of RSL paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) + {X} - {Y, Z}
-        for mb_idx_y in range(len(var_mk_idxs) - 1):  # -1 because no need to check last variable and also symmetry
-            for mb_idx_z in range(mb_idx_y + 1, len(var_mk_idxs)):
-                var_y_idx = var_mk_idxs[mb_idx_y]
-                var_z_idx = var_mk_idxs[mb_idx_z]
-                var_y_name = self.var_names[var_y_idx]
-                var_z_name = self.var_names[var_z_idx]
-                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var_y_idx, var_z_idx}] + [
-                    self.var_names[var_idx]]
-
-                if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
-                    return False
-        return True
+        raise NotImplementedError()
 
     def find_removable(self, var_idx_list: List[int]) -> int:
         """

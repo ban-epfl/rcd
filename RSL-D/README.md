@@ -1,3 +1,0 @@
-This folder contains the implementation of the Recursive Structure Learning algorithm for diamond-free graphs (RSL-D). The implementation is based on the paper titled "Learning Bayesian Networks in the Presence of Structural Side Information" by Ehsan Mokhtarian, Sina Akbari, Fateme Jamshidi, Jalal Etesami, and Negar Kiyavash, published in AAAI 2022 (https://ojs.aaai.org/index.php/AAAI/article/view/20750/20509).
-
-Details of the approach are given in Section 5.3, and the pseudo-code is given in Section 6.5.2 of our paper. The RSL-D algorithm is implemented in rsl_d.py, with an example of how to use it given in rsl_d_demo.py.
