@@ -28,6 +28,8 @@ class RSLBoundedClique(RSLBase):
         super().__init__(ci_test)
         self.clique_num = clique_num
 
+    # TODO move clique_num to learn_and_get_skeleton
+
     def find_neighborhood(self, var_idx: int) -> np.ndarray:
         """
         # TODO CHECK
@@ -79,12 +81,12 @@ class RSLBoundedClique(RSLBase):
         # use Lemma 1 of rsl paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) + {X} - ({Y, Z} + S)
         # get all subsets with size from 0 to self.clique_num - 2.
         # for each subset, check if there exists a pair of variables that are d-separated given the subset
-        for subset_size in range(self.clique_num - 1):
+        for subset_size in range(max(self.clique_num - 1, self.num_vars + 1)):
             # var_s_idxs contains the indices of the variables in the subset S
             for var_s_idxs in itertools.combinations(var_mk_idxs, subset_size):
                 var_mk_idxs_left = list(set(var_mk_idxs) - set(var_s_idxs))
 
-                for mb_idx_left_y in range(len(var_mk_idxs_left) - 1):  # -1 because symmetry
+                for mb_idx_left_y in range(len(var_mk_idxs_left)):
                     var_y_idx = var_mk_idxs_left[mb_idx_left_y]
                     var_y_name = self.var_names[var_y_idx]
 

@@ -1,7 +1,17 @@
+import networkx as nx
+from matplotlib import pyplot as plt
+
+from rcd.rsl.rsl_d import RSLDiamondFree
 from rcd.rsl.rsl_w import RSLBoundedClique
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
 from rcd.utilities.utils import f1_score_edges
+
+
+def get_clique_number(graph: nx.Graph):
+    maximum_clique = max(nx.find_cliques(graph), key=len)
+    clique_number = len(maximum_clique)
+    return clique_number
 
 if __name__ == '__main__':
     """
@@ -13,24 +23,40 @@ if __name__ == '__main__':
     """
 
     # generate a random DAG
-    np.random.seed(2308)
-    n = 10
-    p = n ** (-0.32)
+    np.random.seed(23429)
+    n = 6
+    p = n ** (-0.5)
     adj_mat = gen_er_dag_adj_mat(n, p)
+
+    # draw graph
+    nx.draw(nx.from_numpy_array(adj_mat, create_using=nx.DiGraph), with_labels=True)
+    plt.show()
 
     # get graph clique number
     graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph).to_undirected()
-    maximum_clique = max(nx.find_cliques(graph), key=len)
-    clique_number = len(maximum_clique)
+
+    clique_number = get_clique_number(graph)
+    print("Clique number: ", clique_number)
 
     # generate data from the DAG
     data_df = gen_gaussian_data(adj_mat, 1000)
 
     # run rsl-D
-    ci_rest = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.005)
-    ci_test = get_perfect_ci_test(adj_mat)
-    rsl_d = RSLBoundedClique(ci_rest, clique_number)
+    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.005)
+    perfect_ci_test = get_perfect_ci_test(adj_mat)
+    rsl_d = RSLBoundedClique(perfect_ci_test, clique_number)
+    # rsl_d = RSLDiamondFree(ci_rest)
+
     learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)
+
+    # draw learned skeleton
+    nx.draw(learned_skeleton, with_labels=True)
+    # make the title red
+    plt.title("Learned skeleton", color='red')
+    plt.show()
+
+
+
 
     # compare the learned skeleton to the true skeleton
     true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)

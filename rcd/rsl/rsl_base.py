@@ -184,9 +184,10 @@ class RSLBase:
             self.markov_boundary_matrix[var_idx, mb_var_idx] = 0
             self.flag_arr[mb_var_idx] = True
 
-        if len(var_markov_boundary) > len(var_neighbors):
-            # Sufficient condition for diamond-free graphs
-            return
+        # TODO remove for RSL W
+        # if len(var_markov_boundary) > len(var_neighbors):
+        #     # Sufficient condition for diamond-free graphs
+        #     return
 
         # find nodes whose co-parent status changes
         # we only remove Y from mkvb of Z iff X is their ONLY common child and they are NOT neighbors)
