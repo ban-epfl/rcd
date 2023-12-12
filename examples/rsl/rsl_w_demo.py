@@ -42,9 +42,9 @@ if __name__ == '__main__':
     data_df = gen_gaussian_data(adj_mat, 1000)
 
     # run rsl-D
-    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.005)
-    perfect_ci_test = get_perfect_ci_test(adj_mat)
-    rsl_d = RSLBoundedClique(perfect_ci_test, clique_number)
+    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
+    # ci_test = get_perfect_ci_test(adj_mat)
+    rsl_d = RSLBoundedClique(ci_test, clique_number)
     # rsl_d = RSLDiamondFree(ci_rest)
 
     learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)

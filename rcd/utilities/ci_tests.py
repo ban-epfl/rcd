@@ -17,37 +17,74 @@ def get_perfect_ci_test(adj_mat: np.ndarray):
     return perfect_ci_test
 
 
-def fisher_z(x_name: str, y_name: str, s: List[str], data_df: pd.DataFrame, significance_level=0.01):
-    # convert data_df to a numpy array
-    data = data_df.to_numpy()
+def fisher_z(x_name: str, y_name: str, s: List[str], data_df: pd.DataFrame, significance_level=0.01) -> bool:
+    """
+    Test for conditional independence between variables X and Y given a set Z in dataset D.
 
-    # convert x_name, y_name, and s to indices
-    x = data_df.columns.get_loc(x_name)
-    y = data_df.columns.get_loc(y_name)
-    s = [data_df.columns.get_loc(var_name) for var_name in s]
+    Parameters:
+    D (numpy.ndarray): A matrix of data with size n*p, where n is the number of samples and p is the number of variables.
+    X (int): Index of the first variable (zero-based indexing).
+    Y (int): Index of the second variable (zero-based indexing).
+    Z (List[int]): A list of indices for variables in the conditioning set (zero-based indexing).
 
-    n = data.shape[0]
-    k = len(s)
-    if k == 0:
-        r = np.corrcoef(data[:, [x, y]].T)[0][1]
+    Returns:
+    int: 1 if conditionally independent, 0 otherwise.
+    """
+
+    # Number of samples
+    n = data_df.shape[0]
+
+    # Select columns corresponding to X, Y, and Z from the dataset
+    data_mat = data_df[[x_name, y_name] + s]
+
+    # Compute the precision matrix
+    R = np.corrcoef(data_mat, rowvar=False)
+    P = np.linalg.inv(R)
+
+    # Calculate the partial correlation coefficient and Fisher Z-transform
+    ro = -P[0, 1] / np.sqrt(P[0, 0] * P[1, 1])
+    zro = 0.5 * np.log((1 + ro) / (1 - ro))
+
+    # Test for conditional independence
+    c = stats.norm.ppf(1 - significance_level / 2)
+    if abs(zro) < c / np.sqrt(n - len(s) - 3):
+        return True
     else:
-        sub_index = [x, y]
-        sub_index.extend(s)
-        sub_corr = np.corrcoef(data[:, sub_index].T)
-        # inverse matrix
-        try:
-            PM = np.linalg.inv(sub_corr)
-        except np.linalg.LinAlgError:
-            PM = np.linalg.pinv(sub_corr)
-        r = -1 * PM[0, 1] / np.sqrt(abs(PM[0, 0] * PM[1, 1]))
-    cut_at = 0.99999
-    r = min(cut_at, max(-1 * cut_at, r))  # make r between -1 and 1
+        return False
 
-    # Fisher’s z-transform
-    res = np.sqrt(n - k - 3) * .5 * np.log1p((2 * r) / (1 - r))
-    p_value = 2 * (1 - stats.norm.cdf(abs(res)))
 
-    return p_value >= significance_level
+#
+# def fisher_z(x_name: str, y_name: str, s: List[str], data_df: pd.DataFrame, significance_level=0.01):
+#     # convert data_df to a numpy array
+#     data = data_df.to_numpy()
+#
+#     # convert x_name, y_name, and s to indices
+#     x = data_df.columns.get_loc(x_name)
+#     y = data_df.columns.get_loc(y_name)
+#     s = [data_df.columns.get_loc(var_name) for var_name in s]
+#
+#     n = data.shape[0]
+#     k = len(s)
+#     if k == 0:
+#         r = np.corrcoef(data[:, [x, y]].T)[0][1]
+#     else:
+#         sub_index = [x, y]
+#         sub_index.extend(s)
+#         sub_corr = np.corrcoef(data[:, sub_index].T)
+#         # inverse matrix
+#         try:
+#             PM = np.linalg.inv(sub_corr)
+#         except np.linalg.LinAlgError:
+#             PM = np.linalg.pinv(sub_corr)
+#         r = -1 * PM[0, 1] / np.sqrt(abs(PM[0, 0] * PM[1, 1]))
+#     cut_at = 0.99999
+#     r = min(cut_at, max(-1 * cut_at, r))  # make r between -1 and 1
+#
+#     # Fisher’s z-transform
+#     res = np.sqrt(n - k - 3) * .5 * np.log1p((2 * r) / (1 - r))
+#     p_value = 2 * (1 - stats.norm.cdf(abs(res)))
+#
+#     return p_value >= significance_level
 
 
 def chi_square(X, Y, Z, data, boolean=True, **kwargs):
