@@ -1,7 +1,3 @@
-import itertools
-
-import numpy as np
-
 from rcd.rol.rol_init import ROLInitializer
 from rcd.utilities.utils import *
 

@@ -1,22 +1,43 @@
-import os
+from typing import List
 
 import networkx as nx
 import numpy as np
 import pandas as pd
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-from pgmpy.base import DAG  # TODO: incorporate DAG from pgmpy into our codebase
 from scipy import stats
-from typing import List
 
-"""
-Taken from pgmpy: https://pgmpy.org/_modules/pgmpy/estimators/CITests.html
-"""
+
+# def get_perfect_ci_test(adj_mat: np.ndarray):
+#     dag = nx.from_numpy_array(adj_mat, create_using=DAG)
+#
+#     perfect_ci_test = lambda x, y, z, data: not dag.is_dconnected(x, y, z)
+#     return perfect_ci_test
+
+def is_d_separated(graph, X, Y, Z):
+    def has_path_to_Y(node, visited, through_collider):
+        if node == Y:
+            return True
+        if node in visited:
+            return False
+        visited.add(node)
+
+        for neighbor in graph.successors(node):
+            if neighbor not in Z and not through_collider:
+                if has_path_to_Y(neighbor, visited, False):
+                    return True
+
+        for neighbor in graph.predecessors(node):
+            if neighbor not in Z:
+                if has_path_to_Y(neighbor, visited, node in Z):
+                    return True
+
+        return False
+
+    return not has_path_to_Y(X, set(), False)
 
 
 def get_perfect_ci_test(adj_mat: np.ndarray):
-    dag = nx.from_numpy_array(adj_mat, create_using=DAG)
-
-    perfect_ci_test = lambda x, y, z, data: not dag.is_dconnected(x, y, z)
+    dag = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph)
+    perfect_ci_test = lambda x, y, z, data: is_d_separated(dag, x, y, z)
     return perfect_ci_test
 
 

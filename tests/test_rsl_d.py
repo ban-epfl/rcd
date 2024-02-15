@@ -1,7 +1,5 @@
 import unittest
 
-from tqdm import tqdm
-
 from rcd.rsl.rsl_d import RSLDiamondFree
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
@@ -45,7 +43,7 @@ class TestRSLD(unittest.TestCase):
 
         num_graphs_to_test = 100
         np.random.seed(2308)
-        for i in tqdm(range(num_graphs_to_test)):
+        for i in range(num_graphs_to_test):
             # generate a random Erdos-Renyi DAG
             adj_mat = gen_er_dag_adj_mat(n, p)
 
