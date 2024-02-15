@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "rsl"
+name = "rcd"
 version = "0.1.0"
 description = "Recursive causal discovery framework"
 authors = ["sepehr78 <elahisepehr@gmail.com>"]
