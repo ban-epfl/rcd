@@ -1,6 +1,9 @@
+import os
+
 import networkx as nx
 import numpy as np
 import pandas as pd
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 from pgmpy.base import DAG  # TODO: incorporate DAG from pgmpy into our codebase
 from scipy import stats
 from typing import List

@@ -2,31 +2,35 @@ import unittest
 
 from tqdm import tqdm
 
-from rcd.rsl.rsl_d import RSLDiamondFree
+from rcd.rsl.rsl_w import RSLBoundedClique
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges
+from rcd.utilities.utils import f1_score_edges, get_clique_number
 
 
-class TestRSLD(unittest.TestCase):
+class TestRSLW(unittest.TestCase):
     def test_with_data(self):
         """
-        Test RSL-D on a single diamond-free graph. We expect it to get a perfect F1 score with sufficient data.
+        Test RSL-W on a single graph with a known clique number with data. We expect it to get a perfect F1 score.
         """
 
         # generate a random Erdos-Renyi DAG
         np.random.seed(2308)
         n = 10
-        p = n ** (-0.85)
+        p = n ** (-0.5)
         adj_mat = gen_er_dag_adj_mat(n, p)
 
-        # generate data from the DAG
-        data_df = gen_gaussian_data(adj_mat, 1000)
+        # get graph clique number
+        graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph).to_undirected()
+        clique_number = get_clique_number(graph)
 
-        # run rsl-D
-        ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-        rsl_d = RSLDiamondFree(ci_test)
-        learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)
+        # generate data from the DAG
+        data_df = gen_gaussian_data(adj_mat, 10000)
+
+        # run rsl-w
+        ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n**2)
+        rsl_w = RSLBoundedClique(ci_test)
+        learned_skeleton = rsl_w.learn_and_get_skeleton(data_df, clique_number)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
@@ -34,14 +38,14 @@ class TestRSLD(unittest.TestCase):
         # compute F1 score
         precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
         self.assertEqual(f1_score, 1, "F1 score should be 1!")
-        print("RSL-D passed the first test!")
+        print("RSL-W passed the first test!")
 
     def test_with_perfect_ci(self):
         """
-        Test RSL-D on 100 random diamond-free graphs. We expect it to get a perfect F1 score with perfect CI tests.
+        Test RSL-W on 100 random ER graphs with known clique numbers. We expect it to get a perfect F1 score with perfect CI tests.
         """
-        n = 30
-        p = n ** (-0.85)
+        n = 15
+        p = n ** (-0.5)
 
         num_graphs_to_test = 100
         np.random.seed(2308)
@@ -49,13 +53,18 @@ class TestRSLD(unittest.TestCase):
             # generate a random Erdos-Renyi DAG
             adj_mat = gen_er_dag_adj_mat(n, p)
 
+            # get graph clique number
+            graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph).to_undirected()
+
+            clique_number = get_clique_number(graph)
+
             # generate data from the DAG (unused as we use a perfect CI test)
             data_df = gen_gaussian_data(adj_mat, 1)
 
             # run rsl-D
             ci_test = get_perfect_ci_test(adj_mat)
-            rsl_d = RSLDiamondFree(ci_test)
-            learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)
+            rsl_w = RSLBoundedClique(ci_test)
+            learned_skeleton = rsl_w.learn_and_get_skeleton(data_df, clique_number)
 
             # compare the learned skeleton to the true skeleton
             true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
@@ -63,4 +72,4 @@ class TestRSLD(unittest.TestCase):
             # compute F1 score
             precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
             self.assertEqual(f1_score, 1, "F1 score of " + str(f1_score) + " for graph " + str(i) + " should be 1!")
-        print("RSL-D passed the second test!")
+        print("RSL-W passed the second test!")

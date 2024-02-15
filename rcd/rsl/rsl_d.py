@@ -1,5 +1,4 @@
 import numpy as np
-
 from rcd.rsl.rsl_base import RSLBase
 
 """
@@ -16,59 +15,66 @@ learned skeleton.
 
 
 class RSLDiamondFree(RSLBase):
-    def find_neighborhood(self, var_idx: int) -> np.ndarray:
+
+    def __init__(self, ci_test):
+        super().__init__(ci_test)
+        self.is_rsl_d = True
+
+    def find_neighborhood(self, var: int) -> np.ndarray:
         """
-        Find the neighborhood of a variable using Lemma 4 of the rsl paper.
-        :param var_idx: Index of the variable in the data
-        :return: 1D numpy array containing the indices of the variables in the neighborhood
+        Find the neighborhood of a variable using Proposition 40.
+        :param var: The variable whose neighborhood we want to find.
+        :return: 1D numpy array containing the variables in the neighborhood.
         """
 
-        var_name = self.var_names[var_idx]
-        var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.flatnonzero(var_mk_arr)
+        var_name = self.var_names[var]
+        var_mk_bool_arr = self.markov_boundary_matrix[var]
+        var_mk_arr = np.flatnonzero(var_mk_bool_arr)
+        var_mk_set = set(var_mk_arr)
 
         # loop through markov boundary matrix row corresponding to var_name
-        # use Lemma 4 of rsl paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) - {Y, Z}
-        # at first, assume all variables are neighbors
-        neighbors = np.copy(var_mk_arr)
+        # use Proposition 40: var_y is Y and var_z is Z. cond_set is Mb(X) - {Y, Z}
 
-        for mb_idx_y in range(len(var_mk_idxs)):
-            for mb_idx_z in range(len(var_mk_idxs)):
-                if mb_idx_y == mb_idx_z:
+        # First, assume all variables are neighbors
+        neighbor_bool_arr = np.copy(var_mk_bool_arr)
+
+        for var_y in var_mk_arr:
+            for var_z in var_mk_arr:
+                if var_y == var_z:
                     continue
-                var_y_idx = var_mk_idxs[mb_idx_y]
-                var_z_idx = var_mk_idxs[mb_idx_z]
-                var_y_name = self.var_names[var_y_idx]
-                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var_y_idx, var_z_idx}]
+                var_y_name = self.var_names[var_y]
+                cond_set = [self.var_names[idx] for idx in var_mk_set - {var_y, var_z}]
 
                 if self.ci_test(var_name, var_y_name, cond_set, self.data):
-                    # we know that var2 is a co-parent and thus NOT a neighbor
-                    neighbors[var_y_idx] = 0
+                    # we know that var_y is a co-parent and thus NOT a neighbor
+                    neighbor_bool_arr[var_y] = 0
                     break
+            if not neighbor_bool_arr[var_y]:
+                continue
 
-        # remove all variables that are not neighbors
-        neighbors_idx_arr = np.flatnonzero(neighbors)
-        return neighbors_idx_arr
+        # return neighbors
+        neighbor_arr = np.flatnonzero(neighbor_bool_arr)
+        return neighbor_arr
 
-    def is_removable(self, var_idx: int) -> bool:
+    def is_removable(self, var: int) -> bool:
         """
-        Check whether a variable is removable using Lemma 3 of the rsl paper.
-        :param var_idx:
-        :return: True if the variable is removable, False otherwise
+        Check whether a variable is removable using Theorem 39.
+        :param var: The variable to check for removability.
+        :return: True if the variable is removable, False otherwise.
         """
 
-        var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.flatnonzero(var_mk_arr)
+        var_mk_bool_arr = self.markov_boundary_matrix[var]
+        var_mk_arr = np.flatnonzero(var_mk_bool_arr)
+        var_mk_set = set(var_mk_arr)
 
-        # use Lemma 3 of rsl paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) + {X} - {Y, Z}
-        for mb_idx_y in range(len(var_mk_idxs) - 1):  # -1 because no need to check last variable and also symmetry
-            for mb_idx_z in range(mb_idx_y + 1, len(var_mk_idxs)):
-                var_y_idx = var_mk_idxs[mb_idx_y]
-                var_z_idx = var_mk_idxs[mb_idx_z]
-                var_y_name = self.var_names[var_y_idx]
-                var_z_name = self.var_names[var_z_idx]
-                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var_y_idx, var_z_idx}] + [
-                    self.var_names[var_idx]]
+        # use Lemma 3 of rsl paper: var_y is Y and var_z is Z. cond_set is Mb(X) + {X} - {Y, Z}
+        for mb_idx_y in range(len(var_mk_arr) - 1):  # -1 because no need to check last variable and also symmetry
+            for mb_idx_z in range(mb_idx_y + 1, len(var_mk_arr)):
+                var_y = var_mk_arr[mb_idx_y]
+                var_z = var_mk_arr[mb_idx_z]
+                var_y_name = self.var_names[var_y]
+                var_z_name = self.var_names[var_z]
+                cond_set = [self.var_names[idx] for idx in var_mk_set - {var_y, var_z}] + [self.var_names[var]]
 
                 if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
                     return False

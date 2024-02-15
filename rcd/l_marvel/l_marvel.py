@@ -1,7 +1,11 @@
+import itertools
+from itertools import combinations
 from typing import List
 import networkx as nx
 import numpy as np
 import pandas as pd
+
+from rcd.utilities.utils import *
 
 """This file contains the base class implementation for the L-MARVEL for learning causal graphs with latent 
 variables. The class is initialized with a conditional independence test function, which determines whether two 
@@ -35,30 +39,6 @@ def find_markov_boundary(var_name: str, data: pd.DataFrame, ci_test) -> List[str
     return markov_boundary
 
 
-def find_markov_boundary_matrix(data: pd.DataFrame, ci_test) -> np.ndarray:
-    """
-    Computes the Markov boundary matrix for all variables.
-    :param data: Dataframe where each column is a variable
-    :param ci_test: Conditional independence test to use
-    :return: A numpy array containing the Markov boundary (symmetric) matrix, where element ij indicates whether
-    variable i is in the Markov boundary of j
-    """
-
-    num_vars = len(data.columns)
-    var_name_set = set(data.columns)
-    markov_boundary_matrix = np.zeros((num_vars, num_vars), dtype=int)
-
-    for i in range(num_vars - 1):  # -1 because no need to check last variable
-        var_name = data.columns[i]
-        for j in range(i + 1, num_vars):
-            var_name2 = data.columns[j]
-            # check whether var_name and var_name2 are independent of each other given the rest of the variables
-            cond_set = list(var_name_set - {var_name, var_name2})
-            if not ci_test(var_name, var_name2, cond_set, data):
-                markov_boundary_matrix[i, j] = 1
-                markov_boundary_matrix[j, i] = 1
-
-    return markov_boundary_matrix
 
 
 class LMarvel:
@@ -75,8 +55,14 @@ class LMarvel:
         self.var_names = None
         self.ci_test = ci_test
 
-        # we use a flag array to keep track of which variables need to be checked for removal (i.e., we check if true)
-        self.flag_arr = None
+        # we use a flag array to keep track of which variables need to be checked for removal (i.e., we check if False)
+        self.skip_rem_check_vec = None  # SkipCheck_VEC in the paper
+
+        # we use a set to keep track of which Y and Z pairs have been checked for a given X (see IsRemovable in the paper)
+        self.skip_rem_check_set = None  # SkipCheck_MAT in the paper
+
+        # we use a flag array to keep track of which variables' neighbors need to be learned (i.e., we learn if False)
+        self.neighbor_learned_arr = None
         self.var_idx_set = None
         self.markov_boundary_matrix = None
         self.learned_skeleton = None
@@ -86,10 +72,12 @@ class LMarvel:
         self.data = data
         self.var_names = data.columns
 
-        self.flag_arr = np.ones(self.num_vars, dtype=bool)
+        self.skip_rem_check_vec = np.zeros(self.num_vars, dtype=bool)
+        self.skip_rem_check_set = set()
+        self.neighbor_learned_arr = np.zeros(self.num_vars, dtype=bool)
         self.var_idx_set = set(range(self.num_vars))
         self.markov_boundary_matrix = None
-        self.learned_skeleton = None
+        self.learned_skeleton: nx.Graph | None = None
 
     def has_alg_run(self):
         return self.learned_skeleton is not None
@@ -102,70 +90,133 @@ class LMarvel:
         self.reset_fields(data)
 
         # initialize graph
-        skeleton = nx.Graph()
-        skeleton.add_nodes_from(self.var_names)
+        self.learned_skeleton = nx.Graph()
+        self.learned_skeleton.add_nodes_from(self.var_names)
 
         self.markov_boundary_matrix = find_markov_boundary_matrix(self.data, self.ci_test)
 
-        var_idx_left_set = self.var_idx_set.copy()
-        while var_idx_left_set:
-            # find a removable variable
-            removable_var_idx = self.find_removable(list(var_idx_left_set))
+        var_idx_arr = np.arange(self.num_vars)
 
-            # find the neighbors of the removable variable
-            neighbors = self.find_neighborhood(removable_var_idx)
+        var_left_bool_arr = np.ones(len(self.var_names), dtype=bool)  # if ith position is True, indicates that i is left
 
-            # update the markov boundary matrix
-            self.update_markov_boundary_matrix(removable_var_idx, neighbors)
+        for _ in range(self.num_vars - 1):
+            # sort variables by decreasing Markov boundary size
+            # only sort variables that are still left and whose removability has NOT been checked
+            var_to_sort_bool_arr = var_left_bool_arr & ~self.skip_rem_check_vec
+            var_idx_to_sort_arr = var_idx_arr[var_to_sort_bool_arr]
+            sorted_var_idx = sort_vars_by_mkb_size(self.markov_boundary_matrix[var_to_sort_bool_arr], var_idx_to_sort_arr)
 
-            # add edges between the removable variable and its neighbors
-            for neighbor_idx in neighbors:
-                skeleton.add_edge(self.var_names[removable_var_idx], self.var_names[neighbor_idx])
+            for var_idx in sorted_var_idx:
+                # check whether we need to learn the neighbors of var_idx
+                if not self.neighbor_learned_arr[var_idx]:
+                    neighbors = self.find_neighborhood(var_idx)
+                    self.neighbor_learned_arr[var_idx] = True
 
-            # remove the removable variable from the set of variables left
-            var_idx_left_set.remove(removable_var_idx)
+                    # add edges between the variable and its neighbors
+                    for neighbor_idx in neighbors:
+                        self.learned_skeleton.add_edge(self.var_names[var_idx], self.var_names[neighbor_idx])
+                else:
+                    # if neighbors already learned, get them from the graph
+                    neighbors = self.learned_skeleton.neighbors(var_idx)
 
-        self.learned_skeleton = skeleton
-        return skeleton
+                    # make sure to only include neighbours that are still left
+                    neighbors = [neighbor for neighbor in neighbors if var_left_bool_arr[neighbor]]
+
+                # check if variable is removable
+                if self.is_removable(var_idx, neighbors):
+                    # remove the removable variable from the set of variables left
+                    var_left_bool_arr[var_idx] = False
+
+                    # update the markov boundary matrix
+                    self.update_markov_boundary_matrix(var_idx, neighbors)
+                    break
+                else:
+                    self.skip_rem_check_vec[var_idx] = True
+
+        return self.learned_skeleton
 
     def find_neighborhood(self, var_idx: int) -> np.ndarray:
         """
-        Find the neighborhood of a variable using Lemma 4 of the rsl paper.
+        Find the neighborhood of a variable using Lemma 27.
         :param var_idx: Index of the variable in the data
         :return: 1D numpy array containing the indices of the variables in the neighborhood
         """
 
-        raise NotImplementedError()
+        var_name = self.var_names[var_idx]
+        var_mk_arr = self.markov_boundary_matrix[var_idx]
+        var_mk_idxs = np.flatnonzero(var_mk_arr)
 
-    def is_removable(self, var_idx: int) -> bool:
+        neighbors = np.copy(var_mk_arr)
+
+        for mb_idx_y in range(len(var_mk_idxs)):
+            var_y_idx = var_mk_idxs[mb_idx_y]
+            # check if Y is already neighbor of X
+            if not self.learned_skeleton.has_edge(var_idx, var_y_idx):
+                if not self.is_neighbor(var_name, var_y_idx, var_mk_idxs):
+                    neighbors[var_y_idx] = 0
+
+        # remove all variables that are not neighbors
+        neighbors_idx_arr = np.flatnonzero(neighbors)
+        return neighbors_idx_arr
+
+    def is_neighbor(self, var_name: str, var_y_idx: int, var_x_mk_idxs: np.ndarray) -> bool:
+        var_mk_left_idxs = list(set(var_x_mk_idxs) - {var_y_idx})
+        # use lemma 27 and check all proper subsets of Mb(X) - {Y}
+        for cond_set_size in range(len(var_mk_left_idxs)):
+            for var_s_idxs in itertools.combinations(var_mk_left_idxs, cond_set_size):
+                cond_set = [self.var_names[idx] for idx in var_s_idxs]
+                var_y_name = self.var_names[var_y_idx]
+                if self.ci_test(var_name, var_y_name, cond_set, self.data):
+                    # we know that var_y_idx is a co-parent and thus NOT a neighbor
+                    return False
+        return True
+
+    def is_removable(self, var_idx: int, neighbors: np.ndarray) -> bool:
         """
         Check whether a variable is removable using Lemma 3 of the rsl paper.
-        :param var_idx:
+        :param var_idx: Index of the variable
+        :param neighbors: Neighbors of the variable
         :return: True if the variable is removable, False otherwise
         """
 
-        raise NotImplementedError()
+        var_name = self.var_names[var_idx]
+        var_mk_arr = self.markov_boundary_matrix[var_idx]
+        var_mk_idxs = np.flatnonzero(var_mk_arr)
 
-    def find_removable(self, var_idx_list: List[int]) -> int:
-        """
-        Find a removable variable in the given list of variables.
-        :param var_idx_list: List of variable indices
-        :return: Index of the removable variable
-        """
+        def cond_1(var_y_idx, var_z_idx):
+            # there exists subset W in Mb(X) - {Y, Z}, s.t. Y ind. Z | W
+            var_mk_left_idxs = list(set(var_mk_idxs) - {var_y_idx, var_z_idx})
+            for cond_set_size in range(len(var_mk_left_idxs) + 1):
+                for var_s_idxs in itertools.combinations(var_mk_left_idxs, cond_set_size):
+                    cond_set = [self.var_names[idx] for idx in var_s_idxs]
+                    if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
+                        return True
+            return False
 
-        # sort variables by the size of their Markov boundary
-        mb_size = np.sum(self.markov_boundary_matrix[var_idx_list], axis=1)
-        sort_indices = np.argsort(mb_size)
-        sorted_var_idx = np.asarray(var_idx_list, dtype=int)[sort_indices]
+        def cond_2(var_y_idx, var_z_idx):
+            # for all subset W in Mb(X) - {Y, Z}, s.t. Y NOT ind. Z | W + {X}
+            var_mk_left_idxs = list(set(var_mk_idxs) - {var_y_idx, var_z_idx})
+            for cond_set_size in range(len(var_mk_left_idxs) + 1):
+                for var_s_idxs in itertools.combinations(var_mk_left_idxs, cond_set_size):
+                    cond_set = [self.var_names[idx] for idx in var_s_idxs] + [var_name]
+                    if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
+                        return False
+            return True
 
-        for var_idx in sorted_var_idx:
-            if self.flag_arr[var_idx]:
-                self.flag_arr[var_idx] = False
-                if self.is_removable(var_idx):
-                    return var_idx
-
-        # if no removable found, return the first variable
-        return sorted_var_idx[0]
+        # Use Theorem 32 to check if X is removable. Loop over Y in Mb(X) and Z in Ne(X)
+        for var_y_idx in var_mk_idxs:
+            var_y_name = self.var_names[var_y_idx]
+            for var_z_idx in neighbors:
+                var_z_name = self.var_names[var_z_idx]
+                if var_y_idx == var_z_idx:
+                    continue
+                xyz_tuple = (var_idx, min(var_y_idx, var_z_name), max(var_y_idx, var_z_idx))
+                if xyz_tuple in self.skip_rem_check_set:
+                    continue
+                if not (cond_1(var_y_idx, var_z_idx) or cond_2(var_y_idx, var_z_idx)):
+                    return False
+                self.skip_rem_check_set.add(xyz_tuple)
+        return True
 
     def update_markov_boundary_matrix(self, var_idx: int, var_neighbors: np.ndarray):
         """
@@ -180,7 +231,7 @@ class LMarvel:
         for mb_var_idx in np.flatnonzero(self.markov_boundary_matrix[var_idx]):  # TODO use indexing instead
             self.markov_boundary_matrix[mb_var_idx, var_idx] = 0
             self.markov_boundary_matrix[var_idx, mb_var_idx] = 0
-            self.flag_arr[mb_var_idx] = True
+            self.skip_rem_check_vec[mb_var_idx] = False
 
         # TODO remove for RSL W
         # if len(var_markov_boundary) > len(var_neighbors):
@@ -208,5 +259,5 @@ class LMarvel:
                     # we know that Y and Z are co-parents and thus NOT neighbors
                     self.markov_boundary_matrix[var_y_idx, var_z_idx] = 0
                     self.markov_boundary_matrix[var_z_idx, var_y_idx] = 0
-                    self.flag_arr[var_y_idx] = True
-                    self.flag_arr[var_z_idx] = True
+                    self.skip_rem_check_vec[var_y_idx] = False
+                    self.skip_rem_check_vec[var_z_idx] = False

@@ -18,89 +18,77 @@ learned skeleton.
 
 class RSLBoundedClique(RSLBase):
 
-    def __init__(self, ci_test, clique_num: int):
+    def find_neighborhood(self, var: int) -> np.ndarray:
         """
-        Initialize the rsl-W algorithm with a conditional independence test function and an upper bound on the clique
-        number.
-        :param ci_test: Conditional independence test to use (see RSLBase for details)
-        :param clique_num: Upper bound on the clique number of the underlying graph
-        """
-        super().__init__(ci_test)
-        self.clique_num = clique_num
-
-    # TODO move clique_num to learn_and_get_skeleton
-
-    def find_neighborhood(self, var_idx: int) -> np.ndarray:
-        """
-        # TODO CHECK
-        Find the neighborhood of a variable using Lemma 2 of the rsl paper.
-        :param var_idx: Index of the variable in the data
-        :return: 1D numpy array containing the indices of the variables in the neighborhood
+        Find the neighborhood of a variable using Proposition 37.
+        :param var: The variable whose neighborhood we want to find.
+        :return: 1D numpy array containing the variables in the neighborhood
         """
 
-        var_name = self.var_names[var_idx]
-        var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.flatnonzero(var_mk_arr)
+        var_name = self.var_names[var]
+        var_mk_bool_arr = self.markov_boundary_matrix[var]
+        var_mk_arr = np.flatnonzero(var_mk_bool_arr)
+        var_mk_set = set(var_mk_arr)
 
         # loop through markov boundary matrix row corresponding to var_name
-        # use Lemma 2 of rsl paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) - {Y} - S,
+        # use Proposition 37: var_y is Y and var_z_idx is Z. cond_set is Mb(X) - {Y} - S,
         # where S is a subset of Mb(X) - {Y} of size m-1
 
-        # at first, assume all variables are neighbors
-        neighbors = np.copy(var_mk_arr)
+        # First, assume all variables are neighbors
+        neighbor_bool_arr = np.copy(var_mk_bool_arr)
 
-        # var_s_idxs contains the indices of the variables in the subset S
-        for mb_idx_y in range(len(var_mk_idxs)):
-            var_y_idx = var_mk_idxs[mb_idx_y]
-            var_y_name = self.var_names[var_y_idx]
-            var_mk_idxs_left = list(set(var_mk_idxs) - {var_y_idx})
-            for var_s_idxs in itertools.combinations(var_mk_idxs_left, self.clique_num - 1):
-                cond_set = [self.var_names[idx] for idx in set(var_mk_idxs) - {var_y_idx} - set(var_s_idxs)]
-
+        # var_s contains the indices of the variables in the subset S
+        for var_y in var_mk_arr:
+            var_y_name = self.var_names[var_y]
+            var_mk_left = list(var_mk_set - {var_y})
+            for var_s in itertools.combinations(var_mk_left, self.clique_num - 1):
+                cond_set = [self.var_names[idx] for idx in var_mk_set - {var_y} - set(var_s)]
                 if self.ci_test(var_name, var_y_name, cond_set, self.data):
-                    # we know that var2 is a co-parent and thus NOT a neighbor
-                    neighbors[var_y_idx] = 0
+                    # we know that var_y is a co-parent and thus NOT a neighbor
+                    neighbor_bool_arr[var_y] = 0
                     break
+            if not neighbor_bool_arr[var_y]:
+                continue
 
-        # remove all variables that are not neighbors
-        neighbors_idx_arr = np.flatnonzero(neighbors)
-        return neighbors_idx_arr
+        # return neighbors
+        neighbor_arr = np.flatnonzero(neighbor_bool_arr)
+        return neighbor_arr
 
-    def is_removable(self, var_idx: int) -> bool:
-        # TODO CHECK
+    def is_removable(self, var: int) -> bool:
         """
-        Check whether a variable is removable using Lemma 1 of the rsl paper.
-        :param var_idx:
-        :return: True if the variable is removable, False otherwise
+        Check whether a variable is removable using Theorem 36.
+        :param var: The variable to check for removability.
+        :return: True if the variable is removable, False otherwise.
         """
-        var_name = self.var_names[var_idx]
-        var_mk_arr = self.markov_boundary_matrix[var_idx]
-        var_mk_idxs = np.flatnonzero(var_mk_arr)
+        var_name = self.var_names[var]
+        var_mk_bool_arr = self.markov_boundary_matrix[var]
+        var_mk_arr = np.flatnonzero(var_mk_bool_arr)
+        var_mk_set = set(var_mk_arr)
 
-        # TODO change comments
-        # use Lemma 1 of rsl paper: var_y_idx is Y and var_z_idx is Z. cond_set is Mb(X) + {X} - ({Y, Z} + S)
+        # use Theorem 36: var_y is Y and var_z_idx is Z. cond_set is Mb(X) + {X} - ({Y, Z} + S)
         # get all subsets with size from 0 to self.clique_num - 2.
         # for each subset, check if there exists a pair of variables that are d-separated given the subset
         for subset_size in range(max(self.clique_num - 1, self.num_vars + 1)):
-            # var_s_idxs contains the indices of the variables in the subset S
-            for var_s_idxs in itertools.combinations(var_mk_idxs, subset_size):
-                var_mk_idxs_left = list(set(var_mk_idxs) - set(var_s_idxs))
+            # var_s contains the variables in the subset S
+            for var_s in itertools.combinations(var_mk_arr, subset_size):
+                var_mk_left = list(var_mk_set - set(var_s))
+                var_mk_left_set = set(var_mk_left)
 
-                for mb_idx_left_y in range(len(var_mk_idxs_left)):
-                    var_y_idx = var_mk_idxs_left[mb_idx_left_y]
-                    var_y_name = self.var_names[var_y_idx]
+                for mb_idx_left_y in range(len(var_mk_left)):
+                    var_y = var_mk_left[mb_idx_left_y]
+                    var_y_name = self.var_names[var_y]
 
                     # check second condition
-                    cond_set = [self.var_names[idx] for idx in set(var_mk_idxs_left) - {var_y_idx}]
+                    cond_set = [self.var_names[idx] for idx in var_mk_left_set - {var_y}]
+
                     if self.ci_test(var_name, var_y_name, cond_set, self.data):
                         return False
 
                     # check first condition
-                    for mb_idx_left_z in range(mb_idx_left_y + 1, len(var_mk_idxs_left)):
-                        var_z_idx = var_mk_idxs_left[mb_idx_left_z]
+                    for mb_idx_left_z in range(mb_idx_left_y + 1, len(var_mk_left)):
+                        var_z_idx = var_mk_left[mb_idx_left_z]
                         var_z_name = self.var_names[var_z_idx]
-                        cond_set = ([self.var_names[idx] for idx in set(var_mk_idxs_left) - {var_y_idx, var_z_idx}] +
-                                    [var_name])
+                        cond_set = ([self.var_names[idx] for idx in var_mk_left_set - {var_y, var_z_idx}] + [var_name])
 
                         if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
                             return False

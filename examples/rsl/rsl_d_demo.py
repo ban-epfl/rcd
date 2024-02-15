@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     # generate a random Erdos-Renyi DAG
     np.random.seed(2308)
-    n = 50
+    n = 10
     p = n ** (-0.85)
     adj_mat = gen_er_dag_adj_mat(n, p)
 
@@ -22,8 +22,8 @@ if __name__ == '__main__':
     data_df = gen_gaussian_data(adj_mat, 1000)
 
     # run rsl-D
-    ci_rest = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-    rsl_d = RSLDiamondFree(ci_rest)
+    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
+    rsl_d = RSLDiamondFree(ci_test)
     learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)
 
     # compare the learned skeleton to the true skeleton
