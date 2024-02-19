@@ -2,6 +2,8 @@
 # `branches: [main], then this actions runs _twice_ on pull requests, which is
 # annoying.
 
+name: RCD Test
+
 on:
   push:
     branches: [main]
