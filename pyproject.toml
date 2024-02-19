@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rcd"
-version = "0.1.0"
+version = "0.1.1"
 description = "Recursive causal discovery framework"
 authors = ["sepehr78 <elahisepehr@gmail.com>"]
 readme = "README.md"
@@ -11,7 +11,10 @@ networkx = "^3.2.1"
 numpy = "^1.26.4"
 pandas = "^2.2.0"
 scipy = "^1.12.0"
+tqdm = "^4.66.2"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.1"
 
 [build-system]
 requires = ["poetry-core"]
