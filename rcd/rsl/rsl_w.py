@@ -22,7 +22,7 @@ class RSLBoundedClique(RSLBase):
         """
         Find the neighborhood of a variable using Proposition 37.
         :param var: The variable whose neighborhood we want to find.
-        :return: 1D numpy array containing the variables in the neighborhood
+        :return: 1D numpy array containing the variables in the neighborhood.
         """
 
         var_name = self.var_names[var]

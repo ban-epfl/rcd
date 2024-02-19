@@ -1,3 +1,5 @@
+import time
+
 from rcd.rsl.rsl_d import RSLDiamondFree
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
@@ -14,7 +16,7 @@ if __name__ == '__main__':
 
     # generate a random Erdos-Renyi DAG
     np.random.seed(2308)
-    n = 10
+    n = 500
     p = n ** (-0.85)
     adj_mat = gen_er_dag_adj_mat(n, p)
 
@@ -24,7 +26,10 @@ if __name__ == '__main__':
     # run rsl-D
     ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
     rsl_d = RSLDiamondFree(ci_test)
+
+    starting_time = time.time()
     learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)
+    print("Time taken for rsl-D: ", time.time() - starting_time)
 
     # compare the learned skeleton to the true skeleton
     true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)

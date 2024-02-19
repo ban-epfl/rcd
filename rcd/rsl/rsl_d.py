@@ -1,4 +1,5 @@
 import numpy as np
+
 from rcd.rsl.rsl_base import RSLBase
 
 """
@@ -16,8 +17,8 @@ learned skeleton.
 
 class RSLDiamondFree(RSLBase):
 
-    def __init__(self, ci_test):
-        super().__init__(ci_test)
+    def __init__(self, ci_test, find_markov_boundary_matrix_fun):
+        super().__init__(ci_test, find_markov_boundary_matrix_fun)
         self.is_rsl_d = True
 
     def find_neighborhood(self, var: int) -> np.ndarray:

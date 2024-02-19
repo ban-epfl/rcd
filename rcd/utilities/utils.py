@@ -53,7 +53,7 @@ def find_markov_boundary_matrix(data: pd.DataFrame, ci_test) -> np.ndarray:
 
     num_vars = len(data.columns)
     var_name_set = set(data.columns)
-    markov_boundary_matrix = np.zeros((num_vars, num_vars), dtype=int)
+    markov_boundary_matrix = np.zeros((num_vars, num_vars), dtype=bool)
 
     for i in range(num_vars - 1):  # -1 because no need to check last variable
         var_name = data.columns[i]

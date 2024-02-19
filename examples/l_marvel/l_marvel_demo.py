@@ -1,30 +1,25 @@
-from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from rcd.l_marvel.l_marvel import LMarvel
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges
+from rcd.utilities.utils import f1_score_edges, find_markov_boundary_matrix
 
 if __name__ == '__main__':
     """
-    In this example, we first generate an Erdos-Renyi DAG with n=50 nodes and edge probability p=n^{-0.85}. 
-    Notice that by setting p as such, we are guaranteeing with high probability that the generated graph is 
-    diamond-free, which is a requirement for rsl-D. Then, we generate 1000 samples per variable from this DAG and run 
-    rsl-D on it, comparing the learned skeleton to the true skeleton. We use the Pearson correlation coefficient as 
-    the CI test.
+    In this example, we first generate an Erdos-Renyi DAG. Then, we generate 1000 samples per variable from this 
+    DAG and run L-MARVEL on it, comparing the learned skeleton to the true skeleton. We use the Pearson correlation 
+    coefficient as the CI test.
     """
 
     # generate a random Erdos-Renyi DAG
     # np.random.seed(2308)
-    n = 20
-    p = 2 * np.log(n) / n
-
-    # ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
+    n = 50
+    p = n ** (-0.9)
 
 
     rng = np.random.default_rng(2308)
-    for i in tqdm(range(100)):
+    for i in tqdm(range(10)):
         seed = rng.integers(100000)
         # seed = 10925
         np.random.seed(seed)
@@ -35,10 +30,13 @@ if __name__ == '__main__':
         # plt.show()
 
         # generate data from the DAG
-        data_df = gen_gaussian_data(adj_mat, 1000)
+        data_df = gen_gaussian_data(adj_mat, 10000)
 
-        ci_test = get_perfect_ci_test(adj_mat)
-        l_marvel = LMarvel(ci_test)
+        ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
+        ci_test_mk = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
+        find_markov_boundary_matrix_fun = lambda data: find_markov_boundary_matrix(data, ci_test_mk)
+        # ci_test = get_perfect_ci_test(adj_mat)
+        l_marvel = LMarvel(ci_test, find_markov_boundary_matrix_fun)
 
         # run l-marvel
         learned_skeleton = l_marvel.learn_and_get_skeleton(data_df)
