@@ -69,14 +69,14 @@ class RSLDiamondFree(RSLBase):
         var_mk_set = set(var_mk_arr)
 
         # use Lemma 3 of rsl paper: var_y is Y and var_z is Z. cond_set is Mb(X) + {X} - {Y, Z}
-        for mb_idx_y in range(len(var_mk_arr) - 1):  # -1 because no need to check last variable and also symmetry
-            for mb_idx_z in range(mb_idx_y + 1, len(var_mk_arr)):
-                var_y = var_mk_arr[mb_idx_y]
-                var_z = var_mk_arr[mb_idx_z]
-                var_y_name = self.var_names[var_y]
-                var_z_name = self.var_names[var_z]
-                cond_set = [self.var_names[idx] for idx in var_mk_set - {var_y, var_z}] + [self.var_names[var]]
-
-                if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
-                    return False
+        # for mb_idx_y in range(len(var_mk_arr) - 1):  # -1 because no need to check last variable and also symmetry
+        #     for mb_idx_z in range(mb_idx_y + 1, len(var_mk_arr)):
+        #         var_y = var_mk_arr[mb_idx_y]
+        #         var_z = var_mk_arr[mb_idx_z]
+        #         var_y_name = self.var_names[var_y]
+        #         var_z_name = self.var_names[var_z]
+        #         cond_set = [self.var_names[idx] for idx in var_mk_set - {var_y, var_z}] + [self.var_names[var]]
+        #
+        #         if self.ci_test(var_y_name, var_z_name, cond_set, self.data):
+        #             return False
         return True
