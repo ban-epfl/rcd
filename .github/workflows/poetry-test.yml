@@ -3,7 +3,7 @@
 # annoying.
 
 name: RCD Test
-
+run-name: Run PyTest
 on:
   push:
     branches: [main]

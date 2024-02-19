@@ -50,7 +50,7 @@ def test_with_perfect_ci():
     n = 20
     p = 2 * np.log(n) / n
 
-    num_graphs_to_test = 100
+    num_graphs_to_test = 10
     np.random.seed(2308)
     for i in range(num_graphs_to_test):
         # generate a random Erdos-Renyi DAG

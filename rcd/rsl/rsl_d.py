@@ -17,7 +17,7 @@ learned skeleton.
 
 class RSLDiamondFree(RSLBase):
 
-    def __init__(self, ci_test, find_markov_boundary_matrix_fun):
+    def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
         super().__init__(ci_test, find_markov_boundary_matrix_fun)
         self.is_rsl_d = True
 
