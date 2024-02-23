@@ -15,6 +15,7 @@ The package is available on PyPI and can be installed using pip:
 pip install rcd
 ```
 
+
 ## Basic usage
 The following snipped creates a random directed acyclic graph (DAG) and generates Gaussian data from it. Then, it uses one of the algorithms provided in our package, RSL-D, to learn the skeleton of the DAG from the data. Finally, it compares the learned skeleton to the true skeleton and computes the F1 score based on the edges.
 
