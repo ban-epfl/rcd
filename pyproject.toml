@@ -15,6 +15,9 @@ tqdm = "^4.66.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.1"
+mkdocs = "^1.5.3"
+mkdocs-material = "^9.5.10"
+mkdocstrings = {extras = ["python"], version = "^0.24.0"}
 
 [build-system]
 requires = ["poetry-core"]

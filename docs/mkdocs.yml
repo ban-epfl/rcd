@@ -1,0 +1,30 @@
+# mkdocs.yml
+site_name: RCD
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+theme:
+  name: "material"
+  features:
+    - navigation.tabs
+    - content.code.select
+    - content.code.copy
+
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          selection:
+            docstring_style: sphinx
+
+nav:
+  - Home: index.md
+  - References: reference.md
