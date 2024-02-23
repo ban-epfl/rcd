@@ -6,7 +6,7 @@ This package provides efficient implementations of algorithms that recursively l
 
 **How to cite:** If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
 
-- ADD CITATION
+- CITATION TO BE ADDED
 
 ## Installation
 The package is available on PyPI and can be installed using pip:
