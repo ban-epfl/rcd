@@ -4,6 +4,8 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+REMOVABLE_NOT_FOUND = -1
+
 
 def get_clique_number(graph: nx.Graph):
     maximum_clique = max(nx.find_cliques(graph), key=len)

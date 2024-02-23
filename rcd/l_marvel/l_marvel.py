@@ -3,11 +3,12 @@ from typing import Set
 
 from rcd.utilities.utils import *
 
-"""This file contains the base class implementation for the L-MARVEL for learning causal graphs with latent 
-variables. The class is initialized with a conditional independence test function, which determines whether two 
-variables are independent given another set of variables, using the data provided. For examples of possible 
-conditional independence tests, see utilities/ci_tests.py. For details on how to write a custom CI test function, 
-look at the constructor (init function) of the RSLBase class below.
+"""
+l_marvel.py contains implementation for the L-MARVEL algorithm for learning causal graphs with latent
+variables. The class is initialized with a conditional independence test function, which determines whether two
+variables are independent given another set of variables, using the data provided. For examples of possible
+conditional independence tests, see utilities/ci_tests.py. For details on how to write a custom CI test function,
+look at the constructor (init function) of the LMarvel class.
 
 The class has a learn_and_get_skeleton function that takes in a Pandas DataFrame of data, where the ith column
 contains samples from the ith variable, and returns a networkx graph representing the learned skeleton.
@@ -17,16 +18,21 @@ contains samples from the ith variable, and returns a networkx graph representin
 class LMarvel:
     def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
         """
-        Initialize the rsl algorithm with the data and conditional independence test to use.
-        :param ci_test: Conditional independence test to use that takes in the names of two variables and a list of
-        variable names as the conditioning set, and returns True if the two variables are independent given the
-        conditioning set, and False otherwise. The signature of the function should be:
-        ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
-        :param find_markov_boundary_matrix_fun: Function to use to find the Markov boundary matrix. The function should
-        take in a Pandas DataFrame of data, and return a 2D numpy array, where the (i, j)th entry is True if the jth
-        variable is in the Markov boundary of the ith variable, and False otherwise.
-        The signature of the function should be:
-        find_markov_boundary_matrix_fun(data: pd.DataFrame) -> np.ndarray
+        Initialize the rsl algorithm with the data and the conditional independence test.
+
+        Args:
+            ci_test (Callable[[str, str, List[str], pd.DataFrame], bool]):
+                A conditional independence test function. It takes the names of two variables
+                and a list of variable names as the conditioning set. It returns True if the two
+                variables are independent given the conditioning set, and False otherwise.
+                Signature:
+                    ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool.
+            find_markov_boundary_matrix_fun (Callable[[pd.DataFrame], np.ndarray]):
+                A function to find the Markov boundary matrix. It takes a Pandas DataFrame of data
+                and returns a 2D numpy array. The (i, j)th entry is True if the jth variable is in the
+                Markov boundary of the ith variable, and False otherwise.
+                Signature:
+                    find_markov_boundary_matrix_fun(data: pd.DataFrame) -> np.ndarray.
         """
         if find_markov_boundary_matrix_fun is None:
             self.find_markov_boundary_matrix = lambda data: find_markov_boundary_matrix(data, ci_test)
@@ -100,6 +106,7 @@ class LMarvel:
             var_to_sort_arr = var_arr[var_to_sort_bool_arr]
             sorted_var_arr = sort_vars_by_mkb_size(self.markov_boundary_matrix[var_to_sort_bool_arr], var_to_sort_arr)
 
+            removable_var = REMOVABLE_NOT_FOUND
             for var in sorted_var_arr:
                 # check whether we need to learn the neighbors of var
                 if not self.neighbor_learned_arr[var]:
@@ -118,15 +125,26 @@ class LMarvel:
 
                 # check if variable is removable
                 if self.is_removable(var, neighbors):
-                    # remove the removable variable from the set of variables left
-                    var_left_bool_arr[var] = False
-
-                    # update the markov boundary matrix
-                    update_markov_boundary_matrix(self.markov_boundary_matrix, self.skip_rem_check_vec, self.var_names,
-                                                  data_included_ci_test, var, neighbors)
+                    removable_var = var
                     break
                 else:
                     self.skip_rem_check_vec[var] = True
+
+            if removable_var == REMOVABLE_NOT_FOUND:
+                # if no removable found, remove the first variable and set all skip rem check flags to False
+                removable_var = sorted_var_arr[0]
+                self.skip_rem_check_vec[:] = False
+            else:
+                # remove the removable variable from the set of variables left
+                var_left_bool_arr[removable_var] = False
+
+            # get the neighbors of the removable variable
+            # make sure to only include neighbors that are still left
+            neighbors = [neighbor for neighbor in self.learned_skeleton.neighbors(removable_var) if var_left_bool_arr[neighbor]]
+
+            # update the markov boundary matrix
+            update_markov_boundary_matrix(self.markov_boundary_matrix, self.skip_rem_check_vec, self.var_names,
+                                          data_included_ci_test, removable_var, neighbors)
 
         return self.learned_skeleton
 

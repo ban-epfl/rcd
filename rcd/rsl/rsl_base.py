@@ -12,8 +12,6 @@ The class has a learn_and_get_skeleton function that takes in a Pandas DataFrame
 contains samples from the ith variable, and returns a networkx graph representing the learned skeleton.
 """
 
-REMOVABLE_NOT_FOUND = -1
-
 
 class RSLBase:
     def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
