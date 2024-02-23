@@ -12,6 +12,8 @@ The class has a learn_and_get_skeleton function that takes in a Pandas DataFrame
 contains samples from the ith variable, and returns a networkx graph representing the learned skeleton.
 """
 
+REMOVABLE_NOT_FOUND = -1
+
 
 class RSLBase:
     def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
@@ -92,8 +94,18 @@ class RSLBase:
             # only consider variables that are left and have skip check set to False
             var_to_check_arr = var_arr[var_left_bool_arr & ~self.skip_rem_check_vec]
 
+            # sort the variables by the size of their markov boundary
+            mb_size = np.sum(self.markov_boundary_matrix[var_to_check_arr], axis=1)
+            sort_indices = np.argsort(mb_size)
+            sorted_var_arr = var_to_check_arr[sort_indices]
+
             # find a removable variable
-            removable_var = self.find_removable(var_to_check_arr)
+            removable_var = self.find_removable(sorted_var_arr)
+
+            if removable_var == REMOVABLE_NOT_FOUND:
+                # if no removable found, remove the first variable and set all skip rem check flags to False
+                removable_var = sorted_var_arr[0]
+                self.skip_rem_check_vec[:] = False
 
             # find the neighbors of the removable variable
             neighbors = self.find_neighborhood(removable_var)
@@ -134,18 +146,12 @@ class RSLBase:
         """
         Find a removable variable in the given list of variables.
         :param var_arr: 1D array of variables.
-        :return: The removable variable.
+        :return: The removable variable, if found, and REMOVABLE_NOT_FOUND if not found
         """
 
-        # sort variables by the size of their Markov boundary
-        mb_size = np.sum(self.markov_boundary_matrix[var_arr], axis=1)
-        sort_indices = np.argsort(mb_size)
-        sorted_var_arr = np.asarray(var_arr, dtype=int)[sort_indices]
-
-        for var in sorted_var_arr:
+        for var in var_arr:
             if self.is_removable(var):
                 return var
             self.skip_rem_check_vec[var] = True
 
-        # if no removable found, return the first variable
-        return sorted_var_arr[0]  # TODO FIX THIS
+        return REMOVABLE_NOT_FOUND
