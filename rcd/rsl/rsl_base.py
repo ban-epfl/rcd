@@ -15,18 +15,21 @@ contains samples from the ith variable, and returns a networkx graph representin
 
 class RSLBase:
     def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
+        """Initialize the rsl algorithm with the conditional independence test to use.
+
+        Args:
+            ci_test: A conditional independence test function that takes in the names of two variables and a list of
+                     variable names as the conditioning set, and returns True if the two variables are independent given
+                     the conditioning set, and False otherwise. The function's signature should be:
+                     ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
+            find_markov_boundary_matrix_fun (optional): A function to find the Markov boundary matrix. This function should
+                                                         take in a Pandas DataFrame of data, and return a 2D numpy array,
+                                                         where the (i, j)th entry is True if the jth variable is in the Markov
+                                                         boundary of the ith variable, and False otherwise. The function's
+                                                         signature should be:
+                                                         find_markov_boundary_matrix_fun(data: pd.DataFrame) -> np.ndarray
         """
-        Initialize the rsl algorithm with the data and conditional independence test to use.
-        :param ci_test: Conditional independence test to use that takes in the names of two variables and a list of
-        variable names as the conditioning set, and returns True if the two variables are independent given the
-        conditioning set, and False otherwise. The signature of the function should be:
-        ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
-        :param find_markov_boundary_matrix_fun: Function to use to find the Markov boundary matrix. The function should
-        take in a Pandas DataFrame of data, and return a 2D numpy array, where the (i, j)th entry is True if the jth
-        variable is in the Markov boundary of the ith variable, and False otherwise.
-        The signature of the function should be:
-        find_markov_boundary_matrix_fun(data: pd.DataFrame) -> np.ndarray
-        """
+
         if find_markov_boundary_matrix_fun is None:
             self.find_markov_boundary_matrix = lambda data: find_markov_boundary_matrix(data, ci_test)
         else:
@@ -45,11 +48,13 @@ class RSLBase:
         self.clique_num = None
 
     def reset_fields(self, data: pd.DataFrame, clique_num: int = None):
+        """Reset the algorithm before running it on new data.
+
+        Args:
+            data (pd.DataFrame): The data to reset the algorithm with.
+            clique_num (int, optional): The clique number of the graph. Only used for rsl-W.
         """
-        Reset the algorithm. Used internally to reset the algorithm before running it on new data.
-        :param data: The data to reset the algorithm with.
-        :param clique_num: The clique number of the graph. Only used for rsl-W.
-        """
+
         self.num_vars = len(data.columns)
         self.data = data
         self.var_names = data.columns.tolist()
@@ -59,18 +64,26 @@ class RSLBase:
         self.learned_skeleton = None
         self.clique_num = clique_num
 
-    def has_alg_run(self):
+    def has_alg_run(self) -> bool:
+        """Check if the algorithm has been run.
+
+        Returns:
+            bool: True if the algorithm has been run, False otherwise.
         """
-        Check if the algorithm has been run.
-        :return: True if the algorithm has been run, False otherwise.
-        """
+
         return self.learned_skeleton is not None
 
     def learn_and_get_skeleton(self, data: pd.DataFrame, clique_num: int = None) -> nx.Graph:
+        """Run the rsl algorithm on the data to learn and return the learned skeleton graph.
+
+        Args:
+            data (pd.DataFrame): The data to learn the skeleton from.
+            clique_num (int, optional): The clique number of the graph, used only for specific versions of the algorithm.
+
+        Returns:
+            nx.Graph: A networkx graph representing the learned skeleton.
         """
-        Run the rsl algorithm on the data to learn and return the learned skeleton graph.
-        :return: A networkx graph representing the learned skeleton
-        """
+
         # if RSL-W and clique_num is not None, throw an error
         if not self.is_rsl_d and clique_num is None:
             raise ValueError("Clique number not given!")
@@ -101,8 +114,11 @@ class RSLBase:
             removable_var = self.find_removable(sorted_var_arr)
 
             if removable_var == REMOVABLE_NOT_FOUND:
-                # if no removable found, remove the first variable and set all skip rem check flags to False
-                removable_var = sorted_var_arr[0]
+                # if no removable found, then pick the variable with the smallest markov boundary from var_left_bool_arr
+                var_left_arr = np.flatnonzero(var_left_bool_arr)
+                mb_size_all = np.sum(self.markov_boundary_matrix[var_left_arr], axis=1)
+                removable_var = var_left_arr[np.argmin(mb_size_all)]
+
                 self.skip_rem_check_vec[:] = False
 
             # find the neighbors of the removable variable
@@ -123,28 +139,37 @@ class RSLBase:
         return skeleton
 
     def find_neighborhood(self, var: int) -> np.ndarray:
-        """
-        Find the neighborhood of a variable.
-        :param var: The variable whose neighborhood we want to find.
-        :return: 1D numpy array containing the the variables in the neighborhood.
+        """Find the neighborhood of a variable.
+
+        Args:
+            var (int): The variable whose neighborhood we want to find.
+
+        Returns:
+            np.ndarray: 1D numpy array containing the variables in the neighborhood.
         """
 
         raise NotImplementedError()
 
     def is_removable(self, var: int) -> bool:
-        """
-        Check whether a variable is removable.
-        :param var: The variable to check.
-        :return: True if the variable is removable, False otherwise.
+        """Check whether a variable is removable.
+
+        Args:
+            var (int): The variable to check.
+
+        Returns:
+            bool: True if the variable is removable, False otherwise.
         """
 
         raise NotImplementedError()
 
     def find_removable(self, var_arr: np.ndarray) -> int:
-        """
-        Find a removable variable in the given list of variables.
-        :param var_arr: 1D array of variables.
-        :return: The removable variable, if found, and REMOVABLE_NOT_FOUND if not found
+        """Find a removable variable in the given list of variables.
+
+        Args:
+            var_arr (np.ndarray): 1D array of variables.
+
+        Returns:
+            int: The index of the removable variable, if found, and a constant (e.g., REMOVABLE_NOT_FOUND) if not found.
         """
 
         for var in var_arr:

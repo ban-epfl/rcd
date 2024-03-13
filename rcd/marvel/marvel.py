@@ -1,9 +1,5 @@
 import itertools
-from itertools import combinations
-from typing import List, Any, Set, Dict, Tuple
-import networkx as nx
-import numpy as np
-import pandas as pd
+from typing import Set, Dict
 
 from rcd.utilities.utils import *
 
@@ -18,37 +14,28 @@ contains samples from the ith variable, and returns a networkx graph representin
 """
 
 
-# currently unused
-def find_markov_boundary(var_name: str, data: pd.DataFrame, ci_test) -> List[str]:
-    """
-
-    :param var_name: Name of the target variable
-    :param data: Dataframe where each column is a variable
-    :param ci_test: Conditional independence test to use
-    :return: List containing the names of the variables in the Markov boundary
-    """
-
-    markov_boundary = []
-    other_vars = [col_name for col_name in data.columns if col_name != var_name]
-    for var in other_vars:
-        # check whether our variable (var_name) is independent of var given the rest of the variables
-        cond_set = list(set(other_vars) - {var_name, var})
-        if not ci_test(var_name, var, cond_set, data):
-            markov_boundary.append(var)
-
-    return markov_boundary
-
-
-
 class Marvel:
-    def __init__(self, ci_test):
+    def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
+        """Initialize the rsl algorithm with the conditional independence test to use.
+
+        Args:
+            ci_test: A conditional independence test function that takes in the names of two variables and a list of
+                     variable names as the conditioning set, and returns True if the two variables are independent given
+                     the conditioning set, and False otherwise. The function's signature should be:
+                     ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
+            find_markov_boundary_matrix_fun (optional): A function to find the Markov boundary matrix. This function should
+                                                         take in a Pandas DataFrame of data, and return a 2D numpy array,
+                                                         where the (i, j)th entry is True if the jth variable is in the Markov
+                                                         boundary of the ith variable, and False otherwise. The function's
+                                                         signature should be:
+                                                         find_markov_boundary_matrix_fun(data: pd.DataFrame) -> np.ndarray
         """
-        Initialize the rsl algorithm with the data and conditional independence test to use.
-        :param ci_test: Conditional independence test to use that takes in the names of two variables and a list of
-        variable names as the conditioning set, and returns True if the two variables are independent given the
-        conditioning set, and False otherwise. The signature of the function should be:
-        ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
-        """
+
+        if find_markov_boundary_matrix_fun is None:
+            self.find_markov_boundary_matrix = lambda data: find_markov_boundary_matrix(data, ci_test)
+        else:
+            self.find_markov_boundary_matrix = find_markov_boundary_matrix_fun
+
         self.num_vars = None
         self.data = None
         self.var_names = None
@@ -74,6 +61,11 @@ class Marvel:
         self.learned_skeleton = None
 
     def reset_fields(self, data: pd.DataFrame):
+        """Reset the algorithm before running it on new data. Used internally by the algorithm.
+
+        Args:
+            data (pd.DataFrame): The data to reset the algorithm with.
+        """
         self.num_vars = len(data.columns)
         self.data = data
         self.var_names = data.columns
@@ -89,12 +81,21 @@ class Marvel:
         self.learned_skeleton: nx.Graph | None = None
 
     def has_alg_run(self):
+        """Check if the algorithm has been run.
+
+        Returns:
+            bool: True if the algorithm has been run, False otherwise.
+        """
         return self.learned_skeleton is not None
 
     def learn_and_get_skeleton(self, data: pd.DataFrame) -> nx.Graph:
-        """
-        Run the rsl algorithm on the data to learn and return the learned skeleton graph
-        :return: A networkx graph representing the learned skeleton
+        """Run the marvel algorithm on the data to learn and return the learned skeleton graph.
+
+        Args:
+            data (pd.DataFrame): The data to learn the skeleton from.
+
+        Returns:
+            nx.Graph: A networkx graph representing the learned skeleton.
         """
         self.reset_fields(data)
 
@@ -102,7 +103,7 @@ class Marvel:
         self.learned_skeleton = nx.Graph()
         self.learned_skeleton.add_nodes_from(self.var_names)
 
-        self.markov_boundary_matrix = find_markov_boundary_matrix(self.data, self.ci_test)
+        self.markov_boundary_matrix = self.find_markov_boundary_matrix(self.data)
 
         var_idx_arr = np.arange(self.num_vars)
 
@@ -175,9 +176,11 @@ class Marvel:
                     self.skip_rem_check_vec[var_idx] = True
 
             if not removable_found:
-                # if no removable found, remove the first variable and set all skip rem check flags to False
-                # remove the removable variable from the set of variables left
-                var_idx = sorted_var_idx[0]
+                # if no removable found, then pick the variable with the smallest markov boundary from var_left_bool_arr
+                var_left_arr = np.flatnonzero(var_left_bool_arr)
+                mb_size_all = np.sum(self.markov_boundary_matrix[var_left_arr], axis=1)
+                var_idx = var_left_arr[np.argmin(mb_size_all)]
+
                 neighbors = self.learned_skeleton.neighbors(var_idx)
 
                 # make sure to only include neighbours that are still left
@@ -189,13 +192,14 @@ class Marvel:
                 self.skip_rem_check_vec[:] = False
         return self.learned_skeleton
 
-    def find_neighborhood(self, var_idx: int):  # TODO fix return type
-        """
-        Find the neighborhood of a variable using Lemma 27.
-        :param var_idx: Index of the variable in the data
-        :return: 1D numpy array containing the indices of the variables in the neighborhood, a 1D array containing
-        the indices of the co-parents of the variable, and a list of separating sets that separate var_idx from its
-        co-parents
+    def find_neighborhood(self, var_idx: int):
+        """Find the neighborhood of a variable using Lemma 27.
+
+        Args:
+            var (int): The variable whose neighborhood we want to find.
+
+        Returns:
+            np.ndarray: 1D numpy array containing the variables in the neighborhood.
         """
 
         var_name = self.var_names[var_idx]
@@ -323,12 +327,16 @@ class Marvel:
 
     def learn_v_structure(self, var_idx, neighbors, co_parents_arr, var_mk_idxs, y_sep_set_dict):
         """
-        Learns the v-structures of x.
-        :param var_idx: The variable x
-        :param neighbors: Array of neighbors of x
-        :param co_parents_arr: Array of co-parents of x
-        :param var_mk_idxs: Array of variables in the Markov boundary of x
-        :param y_sep_set_dict: Dictionary that maps y to the separating set of x and y
+        Learns the v-structures of a given variable.
+
+        Args:
+            var_idx (int): The index of the variable for which to learn the v-structures.
+            neighbors (list): A list of indices representing the neighbors of the variable.
+            co_parents_arr (list): A list of indices representing the co-parents of the variable.
+            var_mk_idxs (list): A list of indices representing the variables in the Markov boundary of the variable.
+            y_sep_set_dict (dict): A dictionary mapping indices of other variables to the separating sets
+                that distinguish them from the current variable.
+
         """
 
         def is_y_z_neighbor(var_y, var_z):
@@ -346,7 +354,6 @@ class Marvel:
             self.learned_skeleton.add_edge(self.var_names[var_y], self.var_names[var_z])
             return True
 
-        # TODO change all var_y_idx to var_y
         for var_y in co_parents_arr:
             for var_z in neighbors:
                 sep_set = y_sep_set_dict[var_y]

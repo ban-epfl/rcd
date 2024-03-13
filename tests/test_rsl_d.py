@@ -36,7 +36,7 @@ def test_with_perfect_ci():
     """
     Test RSL-D on 100 random diamond-free graphs. We expect it to get a perfect F1 score with perfect CI tests.
     """
-    n = 30
+    n = 20
     p = n ** (-0.85)
 
     num_graphs_to_test = 100

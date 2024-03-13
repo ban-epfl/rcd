@@ -17,14 +17,21 @@ theme:
     - content.code.select
     - content.code.copy
 
-
 plugins:
   - mkdocstrings:
       handlers:
         python:
           selection:
             docstring_style: sphinx
+  - section-index
 
 nav:
   - Home: index.md
-  - References: reference.md
+  - Code references:
+      - reference.md
+      - RSL Base: code-reference/rsl-base.md
+      - RSL-D: code-reference/rsl-d.md
+      - RSL-W: code-reference/rsl-w.md
+      - MARVEL: code-reference/marvel.md
+      - L-MARVEL: code-reference/l-marvel.md
+      - ROL-HC: code-reference/rol-hc.md

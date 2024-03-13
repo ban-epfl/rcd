@@ -19,10 +19,13 @@ learned skeleton.
 class RSLBoundedClique(RSLBase):
 
     def find_neighborhood(self, var: int) -> np.ndarray:
-        """
-        Find the neighborhood of a variable using Proposition 37.
-        :param var: The variable whose neighborhood we want to find.
-        :return: 1D numpy array containing the variables in the neighborhood.
+        """Find the neighborhood of a variable using Proposition 37.
+
+        Args:
+            var (int): The variable whose neighborhood we want to find.
+
+        Returns:
+            np.ndarray: 1D numpy array containing the variables in the neighborhood.
         """
 
         var_name = self.var_names[var]
@@ -55,11 +58,15 @@ class RSLBoundedClique(RSLBase):
         return neighbor_arr
 
     def is_removable(self, var: int) -> bool:
+        """Check whether a variable is removable using Theorem 36.
+
+        Args:
+            var (int): The variable to check.
+
+        Returns:
+            bool: True if the variable is removable, False otherwise.
         """
-        Check whether a variable is removable using Theorem 36.
-        :param var: The variable to check for removability.
-        :return: True if the variable is removable, False otherwise.
-        """
+
         var_name = self.var_names[var]
         var_mk_bool_arr = self.markov_boundary_matrix[var]
         var_mk_arr = np.flatnonzero(var_mk_bool_arr)

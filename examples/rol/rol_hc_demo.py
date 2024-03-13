@@ -1,7 +1,6 @@
 import time
 
 import networkx as nx
-from matplotlib import pyplot as plt
 
 from rcd.rol.rol_hc import ROLHillClimb
 from rcd.rsl.rsl_d import RSLDiamondFree
@@ -29,7 +28,7 @@ if __name__ == '__main__':
     # generate a random DAG
     np.random.seed(23429)
     n = 20
-    p = np.log(n) / n * 1.5
+    p = np.log(n) / n * 3
     adj_mat = gen_er_dag_adj_mat(n, p)
 
     # get graph clique number
@@ -42,12 +41,12 @@ if __name__ == '__main__':
     ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
 
 
-    ci_test = get_perfect_ci_test(adj_mat)
+    # ci_test = get_perfect_ci_test(adj_mat)
 
-    rsl_d = RSLDiamondFree(ci_test)
-    starting_time = time.time()
-    learned_skeleton_rsl_d = rsl_d.learn_and_get_skeleton(data_df)
-    print("Time taken for rsl-D: ", time.time() - starting_time)
+    # rsl_d = RSLDiamondFree(ci_test)
+    # starting_time = time.time()
+    # learned_skeleton_rsl_d = rsl_d.learn_and_get_skeleton(data_df)
+    # print("Time taken for rsl-D: ", time.time() - starting_time)
 
     rol_hc = ROLHillClimb(ci_test, max_iters=10, max_swaps=5)
     starting_time = time.time()
@@ -58,10 +57,10 @@ if __name__ == '__main__':
     true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
 
     # compute F1 score
-    precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton_rsl_d, return_only_f1=False)
-    print("F1 score for rsl-D: ", f1_score)
-    print("Precision for rsl-D: ", precision)
-    print("Recall for rsl-D: ", recall)
+    # precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton_rsl_d, return_only_f1=False)
+    # print("F1 score for rsl-D: ", f1_score)
+    # print("Precision for rsl-D: ", precision)
+    # print("Recall for rsl-D: ", recall)
 
     precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton_rol_hc, return_only_f1=False)
     print("\nF1 score for rol-hc: ", f1_score)

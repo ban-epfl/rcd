@@ -1,6 +1,3 @@
-This part of the project documentation focuses on
-an **information-oriented** approach. Use it as a
-reference for the technical implementation of the
-`RCD` project code.
+# Introduction
 
-::: rcd.l_marvel.LMarvel
+In this section you will find the API of all of the functions and classes in the `rcd` package.

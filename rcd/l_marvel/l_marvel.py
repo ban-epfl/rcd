@@ -18,7 +18,7 @@ contains samples from the ith variable, and returns a networkx graph representin
 class LMarvel:
     def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
         """
-        Initialize the rsl algorithm with the data and the conditional independence test.
+        Initialize the L-Marvel algorithm with the data and the conditional independence test.
 
         Args:
             ci_test (Callable[[str, str, List[str], pd.DataFrame], bool]):
@@ -57,9 +57,10 @@ class LMarvel:
         self.learned_skeleton = None
 
     def reset_fields(self, data: pd.DataFrame):
-        """
-        Reset the algorithm. Used internally to reset the algorithm before running it on new data.
-        :param data: The data to reset the algorithm with.
+        """Reset the algorithm before running it on new data. Used internally by the algorithm.
+
+        Args:
+            data (pd.DataFrame): The data to reset the algorithm with.
         """
         self.num_vars = len(data.columns)
         self.data = data
@@ -73,17 +74,21 @@ class LMarvel:
         self.learned_skeleton: nx.Graph | None = None
 
     def has_alg_run(self):
-        """
-        Check if the algorithm has been run.
-        :return: True if the algorithm has been run, False otherwise.
+        """Check if the algorithm has been run.
+
+        Returns:
+            bool: True if the algorithm has been run, False otherwise.
         """
         return self.learned_skeleton is not None
 
     def learn_and_get_skeleton(self, data: pd.DataFrame) -> nx.Graph:
-        """
-        Run the l-marvel algorithm on the data to learn and return the learned skeleton graph
-        :param data: The data to learn the skeleton from
-        :return: A networkx graph representing the learned skeleton
+        """Run the l-marvel algorithm on the data to learn and return the learned skeleton graph.
+
+        Args:
+            data (pd.DataFrame): The data to learn the skeleton from.
+
+        Returns:
+            nx.Graph: A networkx graph representing the learned skeleton.
         """
         self.reset_fields(data)
 
@@ -131,8 +136,11 @@ class LMarvel:
                     self.skip_rem_check_vec[var] = True
 
             if removable_var == REMOVABLE_NOT_FOUND:
-                # if no removable found, remove the first variable and set all skip rem check flags to False
-                removable_var = sorted_var_arr[0]
+                # if no removable found, then pick the variable with the smallest markov boundary from var_left_bool_arr
+                var_left_arr = np.flatnonzero(var_left_bool_arr)
+                mb_size_all = np.sum(self.markov_boundary_matrix[var_left_arr], axis=1)
+                removable_var = var_left_arr[np.argmin(mb_size_all)]
+
                 self.skip_rem_check_vec[:] = False
             else:
                 # remove the removable variable from the set of variables left
@@ -149,10 +157,13 @@ class LMarvel:
         return self.learned_skeleton
 
     def find_neighborhood(self, var: int) -> np.ndarray:
-        """
-        Find the neighborhood of a variable using Lemma 27.
-        :param var: The variable whose neighborhood we want to find.
-        :return: 1D numpy array containing the the variables in the neighborhood.
+        """Find the neighborhood of a variable using Lemma 27.
+
+        Args:
+            var (int): The variable whose neighborhood we want to find.
+
+        Returns:
+            np.ndarray: 1D numpy array containing the variables in the neighborhood.
         """
 
         var_name = self.var_names[var]
@@ -173,13 +184,17 @@ class LMarvel:
         return neighbors
 
     def is_neighbor(self, var_name: str, var_y: int, var_mk_set: Set[int]) -> bool:
+        """Check if var_y is a neighbor of variable with name var_name using Lemma 27.
+
+        Args:
+            var_name (str): Name of the variable.
+            var_y (int): The variable to check.
+            var_mk_set (Set[int]): Set of the variables in the Markov boundary of var_name.
+
+        Returns:
+            bool: True if var_y is a neighbor, False otherwise.
         """
-        Check if var_y is a neighbor of variable with name var_name using Lemma 27.
-        :param var_name: Name of the variable.
-        :param var_y: The variable to check.
-        :param var_mk_set: Set of the variables in the Markov boundary of var_name.
-        :return: True if var_y is a neighbor, False otherwise.
-        """
+
         var_mk_left_list = list(var_mk_set - {var_y})
         # use lemma 27 and check all proper subsets of Mb(X) - {Y}
         for cond_set_size in range(len(var_mk_left_list)):
@@ -192,11 +207,14 @@ class LMarvel:
         return True
 
     def is_removable(self, var: int, neighbors: np.ndarray) -> bool:
-        """
-        Check whether a variable is removable using Theorem 32.
-        :param var: Index of the variable.
-        :param neighbors: Neighbors of the variable.
-        :return: True if the variable is removable, False otherwise.
+        """Check whether a variable is removable using Theorem 32.
+
+        Args:
+            var (int): Index of the variable.
+            neighbors (np.ndarray): Neighbors of the variable.
+
+        Returns:
+            bool: True if the variable is removable, False otherwise.
         """
 
         var_name = self.var_names[var]

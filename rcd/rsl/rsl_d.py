@@ -18,14 +18,31 @@ learned skeleton.
 class RSLDiamondFree(RSLBase):
 
     def __init__(self, ci_test, find_markov_boundary_matrix_fun=None):
+        """Initialize the rsl algorithm with the conditional independence test to use.
+
+        Args:
+            ci_test: A conditional independence test function that takes in the names of two variables and a list of
+                     variable names as the conditioning set, and returns True if the two variables are independent given
+                     the conditioning set, and False otherwise. The function's signature should be:
+                     ci_test(var_name1: str, var_name2: str, cond_set: List[str], data: pd.DataFrame) -> bool
+            find_markov_boundary_matrix_fun (optional): A function to find the Markov boundary matrix. This function should
+                                                         take in a Pandas DataFrame of data, and return a 2D numpy array,
+                                                         where the (i, j)th entry is True if the jth variable is in the Markov
+                                                         boundary of the ith variable, and False otherwise. The function's
+                                                         signature should be:
+                                                         find_markov_boundary_matrix_fun(data: pd.DataFrame) -> np.ndarray
+        """
         super().__init__(ci_test, find_markov_boundary_matrix_fun)
         self.is_rsl_d = True
 
     def find_neighborhood(self, var: int) -> np.ndarray:
-        """
-        Find the neighborhood of a variable using Proposition 40.
-        :param var: The variable whose neighborhood we want to find.
-        :return: 1D numpy array containing the variables in the neighborhood.
+        """Find the neighborhood of a variable using Proposition 40.
+
+        Args:
+            var (int): The variable whose neighborhood we want to find.
+
+        Returns:
+            np.ndarray: 1D numpy array containing the variables in the neighborhood.
         """
 
         var_name = self.var_names[var]
@@ -58,10 +75,13 @@ class RSLDiamondFree(RSLBase):
         return neighbor_arr
 
     def is_removable(self, var: int) -> bool:
-        """
-        Check whether a variable is removable using Theorem 39.
-        :param var: The variable to check for removability.
-        :return: True if the variable is removable, False otherwise.
+        """Check whether a variable is removable using Theorem 39.
+
+        Args:
+            var (int): The variable to check.
+
+        Returns:
+            bool: True if the variable is removable, False otherwise.
         """
 
         var_mk_bool_arr = self.markov_boundary_matrix[var]

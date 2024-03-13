@@ -18,6 +18,9 @@ pytest = "^8.0.1"
 mkdocs = "^1.5.3"
 mkdocs-material = "^9.5.10"
 mkdocstrings = {extras = ["python"], version = "^0.24.0"}
+mkdocs-section-index = "^0.3.8"
+h5py = "^3.10.0"
+joblib = "^1.3.2"
 
 [build-system]
 requires = ["poetry-core"]

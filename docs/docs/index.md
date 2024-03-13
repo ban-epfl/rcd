@@ -6,7 +6,18 @@ This package provides efficient implementations of algorithms that recursively l
 
 **How to cite:** If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
 
-- CITATION TO BE ADDED
+- Mokhtarian, Ehsan and Elahi, Sepehr and Akbari, Sina and Kiyavash, Negar. "Recursive Causal Discovery." arXiv preprint (2024).
+
+BibTeX entry:
+```bibtex
+@article{mokhtarian2024recursive,
+  title={Recursive Causal Discovery},
+  author={Mokhtarian, Ehsan and Elahi, Sepehr and Akbari, Sina and Kiyavash, Negar},
+  journal={arXiv preprint arXiv:2024},
+  year={2024}
+}
+```
+
 
 ## Installation
 The package is available on PyPI and can be installed using pip:
