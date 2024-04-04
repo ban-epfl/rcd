@@ -4,13 +4,12 @@
 This package provides efficient implementations of algorithms that recursively learn a causal graph from observational data.
 `RCD` focuses on user-friendliness with a well-documented and uniform interface. Moreover, its modular design allows for the integration and expansion of other algorithms and models within the package.
 
-**How to cite:** If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
+## How to cite:
+If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
+
+Mokhtarian, Ehsan, Sepehr Elahi, Sina Akbari, and Negar Kiyavash. "Recursive Causal Discovery." arXiv preprint arXiv:2403.09300 (2024).
 
 Link to the paper: [arXiv](https://arxiv.org/abs/2403.09300) 
-
-
-- Mokhtarian, Ehsan, Sepehr Elahi, Sina Akbari, and Negar Kiyavash. "Recursive Causal Discovery." arXiv preprint arXiv:2403.09300 (2024).
-
 
 BibTeX entry:
 ```bibtex
@@ -24,6 +23,9 @@ BibTeX entry:
 
 ## GitHub:
 The source code is available on [GitHub](https://github.com/ban-epfl/rcd).
+
+## Website:
+Documentation are available on [RCD website](https://rcdpackage.com).
 
 ## Installation
 The package is available on PyPI and can be installed using pip:
