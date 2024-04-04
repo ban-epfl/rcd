@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     # generate a random Erdos-Renyi DAG
     np.random.seed(2308)
-    n = 500
+    n = 50
     p = n ** (-0.85)
     adj_mat = gen_er_dag_adj_mat(n, p)
 

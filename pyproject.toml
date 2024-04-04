@@ -10,7 +10,7 @@ python = "^3.10"
 networkx = "^3.2.1"
 numpy = "^1.26.4"
 pandas = "^2.2.0"
-scipy = "^1.12.0"
+scipy = "^1.13.0"
 tqdm = "^4.66.2"
 
 [tool.poetry.group.dev.dependencies]
