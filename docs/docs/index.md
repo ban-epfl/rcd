@@ -6,7 +6,11 @@ This package provides efficient implementations of algorithms that recursively l
 
 **How to cite:** If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
 
-- Mokhtarian, Ehsan and Elahi, Sepehr and Akbari, Sina and Kiyavash, Negar. "Recursive Causal Discovery." arXiv preprint (2024).
+Link to the paper: [arXiv](https://arxiv.org/abs/2403.09300) 
+
+
+- Mokhtarian, Ehsan, Sepehr Elahi, Sina Akbari, and Negar Kiyavash. "Recursive Causal Discovery." arXiv preprint arXiv:2403.09300 (2024).
+
 
 BibTeX entry:
 ```bibtex
@@ -18,6 +22,8 @@ BibTeX entry:
 }
 ```
 
+## GitHub:
+The source code is available on [GitHub](https://github.com/ban-epfl/rcd).
 
 ## Installation
 The package is available on PyPI and can be installed using pip:
