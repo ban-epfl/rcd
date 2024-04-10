@@ -24,5 +24,11 @@ jobs:
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install mkdocs-material 'mkdocstrings[python]' mkdocs-section-index
-      - run: mkdocs gh-deploy --config-file docs/mkdocs.yml --force
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Configure Poetry
+        run: poetry config virtualenvs.create false
+      - name: Install dependencies and project using Poetry
+        run: poetry install
+      - name: Build and Deploy Documentation
+        run: poetry run mkdocs gh-deploy --config-file docs/mkdocs.yml --force
