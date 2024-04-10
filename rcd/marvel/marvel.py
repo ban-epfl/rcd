@@ -359,7 +359,7 @@ class Marvel:
                 sep_set = y_sep_set_dict[var_y]
                 if var_z not in sep_set and is_y_z_neighbor(var_y, var_z):
                     x_v_structure_dict = self.v_structure_dict.get(var_idx, dict())
-                    z_set = x_v_structure_dict.get(var_z, set())
+                    z_set = x_v_structure_dict.get(var_y, set())
                     z_set.add(var_z)
                     x_v_structure_dict[var_y] = z_set
                     self.v_structure_dict[var_idx] = x_v_structure_dict
