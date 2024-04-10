@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rcd"
-version = "0.1.1"
+version = "0.1.2"
 description = "Recursive causal discovery framework"
 authors = ["sepehr78 <elahisepehr@gmail.com>"]
 readme = "README.md"
