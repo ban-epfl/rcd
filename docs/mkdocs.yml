@@ -1,6 +1,9 @@
 # mkdocs.yml
 site_name: RCD
 
+extra_files:
+  - CNAME
+
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
