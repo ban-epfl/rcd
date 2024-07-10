@@ -8,10 +8,10 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 networkx = "^3.2.1"
-numpy = "^1.26.4"
-pandas = "^2.2.0"
-scipy = "^1.13.0"
-tqdm = "^4.66.2"
+numpy = "^1.26"
+pandas = "^2.2"
+scipy = "^1.13"
+tqdm = "^4.66"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.1"

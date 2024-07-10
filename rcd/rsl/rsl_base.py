@@ -107,7 +107,7 @@ class RSLBase:
 
             # sort the variables by the size of their markov boundary
             mb_size = np.sum(self.markov_boundary_matrix[var_to_check_arr], axis=1)
-            sort_indices = np.argsort(mb_size)
+            sort_indices = np.argsort(mb_size, kind='stable')
             sorted_var_arr = var_to_check_arr[sort_indices]
 
             # find a removable variable
