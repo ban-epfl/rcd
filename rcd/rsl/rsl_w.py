@@ -18,7 +18,8 @@ data, where the ith column contains samples from the ith variable, and returns a
 learned skeleton.
 """
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data_matrix: np.ndarray, clique_num: int) -> nx.Graph:
+def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data_matrix: np.ndarray, clique_num: int,
+                           find_markov_boundary_matrix_fun=None) -> nx.Graph:
     """
     Learn the skeleton of a graph with a bounded clique number using the RSL-W algorithm.
 
@@ -33,7 +34,7 @@ def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], 
     Returns:
         nx.Graph: A networkx graph representing the learned skeleton.
     """
-    rsl_w = _RSLBoundedClique(ci_test)
+    rsl_w = _RSLBoundedClique(ci_test, find_markov_boundary_matrix_fun)
     learned_skeleton = rsl_w.learn_and_get_skeleton(data_matrix, clique_num)
     return learned_skeleton
 

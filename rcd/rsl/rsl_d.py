@@ -18,7 +18,8 @@ learned skeleton.
 """
 
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data_matrix: np.ndarray, clique_num: int = None) -> nx.Graph:
+def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data_matrix: np.ndarray,
+                           find_markov_boundary_matrix_fun=None) -> nx.Graph:
     """
     Learn the skeleton of a diamond-free graph using the RSL-D algorithm.
 
@@ -28,13 +29,12 @@ def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], 
                                 variables are independent given the conditioning set, and False otherwise.
         data_matrix (np.ndarray): The data matrix with shape (num_samples, num_vars), where each column corresponds
                                   to a variable and each row corresponds to a sample.
-        clique_num (int, optional): The clique number of the graph, used only for specific versions of the algorithm.
 
     Returns:
         nx.Graph: A networkx graph representing the learned skeleton.
     """
-    rsl_d = _RSLDiamondFree(ci_test)
-    learned_skeleton = rsl_d.learn_and_get_skeleton(data_matrix, clique_num)
+    rsl_d = _RSLDiamondFree(ci_test, find_markov_boundary_matrix_fun)
+    learned_skeleton = rsl_d.learn_and_get_skeleton(data_matrix)
     return learned_skeleton
 
 

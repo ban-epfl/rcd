@@ -1,7 +1,7 @@
-from rcd.l_marvel.l_marvel import LMarvel
+from rcd import l_marvel
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges, get_clique_number, find_markov_boundary_matrix
+from rcd.utilities.utils import f1_score_edges, find_markov_boundary_matrix
 
 
 def test_with_data():
@@ -29,10 +29,9 @@ def test_with_data():
         ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
         ci_test_mk = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
         find_markov_boundary_matrix_fun = lambda data: find_markov_boundary_matrix(data, ci_test_mk)
-        l_marvel = LMarvel(ci_test, find_markov_boundary_matrix_fun)
 
         # run l-marvel
-        learned_skeleton = l_marvel.learn_and_get_skeleton(data_df)
+        learned_skeleton = l_marvel.learn_and_get_skeleton(ci_test, data_df, find_markov_boundary_matrix_fun=find_markov_boundary_matrix_fun)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
@@ -56,16 +55,12 @@ def test_with_perfect_ci():
         # generate a random Erdos-Renyi DAG
         adj_mat = gen_er_dag_adj_mat(n, p)
 
-        # get graph clique number
-        graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph).to_undirected()
-
         # generate data from the DAG (unused as we use a perfect CI test)
         data_df = gen_gaussian_data(adj_mat, 1)
 
         # run rsl-D
         ci_test = get_perfect_ci_test(adj_mat)
-        rsl_w = LMarvel(ci_test)
-        learned_skeleton = rsl_w.learn_and_get_skeleton(data_df)
+        learned_skeleton = l_marvel.learn_and_get_skeleton(ci_test, data_df)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
