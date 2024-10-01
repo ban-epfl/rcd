@@ -1,4 +1,4 @@
-from rcd.rsl.rsl_w import RSLBoundedClique
+from rcd import rsl_w
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
 from rcd.utilities.utils import f1_score_edges, get_clique_number
@@ -24,15 +24,14 @@ def test_with_data():
 
     # run rsl-w
     ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-    rsl_w = RSLBoundedClique(ci_test)
-    learned_skeleton = rsl_w.learn_and_get_skeleton(data_df, clique_number)
+    learned_skeleton = rsl_w.learn_and_get_skeleton(ci_test, data_df, clique_number)
 
     # compare the learned skeleton to the true skeleton
     true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
 
     # compute F1 score
     precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-    assert f1_score >= 0.95, "F1 score should be 1!"
+    assert f1_score >= 0.95, "F1 score should be larger!"
     print("RSL-W passed the first test!")
 
 
@@ -40,8 +39,8 @@ def test_with_perfect_ci():
     """
     Test RSL-W on 100 random ER graphs with known clique numbers. We expect it to get a perfect F1 score with perfect CI tests.
     """
-    n = 15
-    p = n ** (-0.5)
+    n = 20
+    p = 0.3
 
     num_graphs_to_test = 100
     np.random.seed(2308)
@@ -59,8 +58,7 @@ def test_with_perfect_ci():
 
         # run rsl-W
         ci_test = get_perfect_ci_test(adj_mat)
-        rsl_w = RSLBoundedClique(ci_test)
-        learned_skeleton = rsl_w.learn_and_get_skeleton(data_df, clique_number)
+        learned_skeleton = rsl_w.learn_and_get_skeleton(ci_test, data_df, clique_number)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)

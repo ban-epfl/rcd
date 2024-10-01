@@ -1,9 +1,9 @@
 import time
 
-from rcd.rsl.rsl_d import RSLDiamondFree
+from rcd import rsl_d
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges
+from rcd.utilities.utils import f1_score_edges, markov_boundary_gaussian
 
 if __name__ == '__main__':
     """
@@ -21,14 +21,13 @@ if __name__ == '__main__':
     adj_mat = gen_er_dag_adj_mat(n, p)
 
     # generate data from the DAG
-    data_df = gen_gaussian_data(adj_mat, 1000)
+    data_df = gen_gaussian_data(adj_mat, 20 * n)
 
     # run rsl-D
     ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-    rsl_d = RSLDiamondFree(ci_test)
 
     starting_time = time.time()
-    learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)
+    learned_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_df)
     print("Time taken for rsl-D: ", time.time() - starting_time)
 
     # compare the learned skeleton to the true skeleton
