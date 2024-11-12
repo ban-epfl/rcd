@@ -1,7 +1,8 @@
 from rcd import rsl_w
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges, get_clique_number
+from rcd.utilities.utils import f1_score_edges, get_clique_number, compute_mb
+from rcd_julia import find_markov_boundary_matrix
 
 
 def test_with_data():
@@ -58,7 +59,8 @@ def test_with_perfect_ci():
 
         # run rsl-W
         ci_test = get_perfect_ci_test(adj_mat)
-        learned_skeleton = rsl_w.learn_and_get_skeleton(ci_test, data_df, clique_number)
+        find_markov_boundary_matrix = lambda data: compute_mb(data, ci_test)
+        learned_skeleton = rsl_w.learn_and_get_skeleton(ci_test, data_df, clique_number, find_markov_boundary_matrix)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)

@@ -8,6 +8,30 @@ from scipy import stats
 REMOVABLE_NOT_FOUND = -1
 
 
+def sanitize_data(data):
+    """
+    This function takes as input a data argument and checks if it is a pandas DataFrame or a numpy array.
+    If it's a DataFrame, it converts it to a numpy matrix and returns it.
+    If it's a numpy array, it confirms that it is a matrix and returns it.
+
+    Args:
+    data (pandas.DataFrame or numpy.ndarray): Input data
+
+    Returns:
+    numpy.ndarray: Matrix form of the input data
+    """
+    if isinstance(data, pd.DataFrame):
+        # Convert DataFrame to numpy matrix
+        return data.values
+    elif isinstance(data, np.ndarray):
+        # Check if the numpy array is 2-dimensional (matrix)
+        if data.ndim == 2:
+            return data
+        else:
+            raise ValueError("Input numpy array is not a matrix (2-dimensional).")
+    else:
+        raise TypeError("Input must be a pandas DataFrame or a numpy array.")
+
 def get_clique_number(graph: nx.Graph):
     maximum_clique = max(nx.find_cliques(graph), key=len)
     clique_number = len(maximum_clique)
@@ -45,34 +69,36 @@ def sort_vars_by_mkb_size(markov_boundary_matrix: np.ndarray, var_idx_arr: np.nd
     return sorted_var_idx
 
 
-def find_markov_boundary_matrix(data: pd.DataFrame, ci_test) -> np.ndarray:
+def compute_mb(data: np.ndarray, ci_test: Callable[[int, int, List[int], np.ndarray], bool]) -> np.ndarray:
     """
     Computes the Markov boundary matrix for all variables.
-    :param data: Dataframe where each column is a variable
-    :param ci_test: Conditional independence test to use
-    :return: A numpy array containing the Markov boundary (symmetric) matrix, where element ij indicates whether
-    variable i is in the Markov boundary of j
-    """
 
-    num_vars = len(data.columns)
-    var_name_set = set(data.columns)
+    Args:
+        data (np.ndarray): Data matrix where each column is a variable.
+        ci_test (Callable[[int, int, List[int], np.ndarray], bool]):
+            Conditional independence test to use. It takes the indices of two variables
+            and a list of variable indices as the conditioning set. It returns True if the two
+            variables are independent given the conditioning set, and False otherwise.
+
+    Returns:
+        np.ndarray: A numpy array containing the Markov boundary (symmetric) matrix, where element ij indicates whether
+                    variable i is in the Markov boundary of j.
+    """
+    num_vars = data.shape[1]
     markov_boundary_matrix = np.zeros((num_vars, num_vars), dtype=bool)
 
     for i in range(num_vars - 1):  # -1 because no need to check last variable
-        var_name = data.columns[i]
         for j in range(i + 1, num_vars):
-            var_name2 = data.columns[j]
-            # check whether var_name and var_name2 are independent of each other given the rest of the variables
-            cond_set = list(var_name_set - {var_name, var_name2})
-            if not ci_test(var_name, var_name2, cond_set, data):
-                markov_boundary_matrix[i, j] = 1
-                markov_boundary_matrix[j, i] = 1
+            # Check whether variable i and j are independent of each other given the rest of the variables
+            cond_set = list(set(range(num_vars)) - {i, j})
+            if not ci_test(i, j, cond_set, data):
+                markov_boundary_matrix[i, j] = True
+                markov_boundary_matrix[j, i] = True
 
     return markov_boundary_matrix
 
-def markov_boundary_gaussian(
-        data: pd.DataFrame
-) -> np.ndarray:
+
+def compute_mb_gaussian(data: np.ndarray, sig_level=None) -> np.ndarray:
     """
     Computes the Markov boundary matrix for all variables.
     :param data: Dataframe where each column is a variable
@@ -82,13 +108,13 @@ def markov_boundary_gaussian(
     variable i is in the Markov boundary of j
     """
     num_samples, n = data.shape
-    crr = data.corr()
-    prec = np.linalg.inv(crr)
+    crr = np.corrcoef(data, rowvar=False)
+    prec = np.linalg.pinv(crr)
 
     norm_vec = np.sqrt(np.diag(prec))
     mb_mat = np.abs(prec / norm_vec[:, None] / norm_vec[None, :])
 
-    sig_level = 1 / n ** 2
+    sig_level = 1 / n ** 2 if sig_level is None else sig_level
 
     thresh = np.tanh(stats.norm.ppf(1 - sig_level / 2) / np.sqrt(num_samples - n - 1))
 
@@ -100,10 +126,11 @@ def markov_boundary_gaussian(
     return mb_mat
 
 
-def update_markov_boundary_matrix(markov_boundary_matrix: np.ndarray, skip_check: np.ndarray,
+def update_markov_boundary_matrix(markov_boundary_matrix: np.ndarray,
                                   data_included_ci_test: Callable[[int, int, List[int]], bool],
                                   var: int, var_neighbors: np.ndarray,
-                                  is_diamond_free: bool = False):
+                                  is_diamond_free: bool = False,
+                                  skip_check: np.ndarray = None):
     """
     Update the Markov boundary matrix after removing a variable.
 
@@ -120,7 +147,9 @@ def update_markov_boundary_matrix(markov_boundary_matrix: np.ndarray, skip_check
     # Remove var from Markov boundaries
     markov_boundary_matrix[var_markov_boundary, var] = False
     markov_boundary_matrix[var, var_markov_boundary] = False
-    skip_check[var_markov_boundary] = False
+
+    if skip_check is not None:
+        skip_check[var_markov_boundary] = False
 
     if is_diamond_free:
         if len(var_markov_boundary) > len(var_neighbors):
@@ -146,5 +175,7 @@ def update_markov_boundary_matrix(markov_boundary_matrix: np.ndarray, skip_check
                 # Y and Z are co-parents and thus NOT neighbors
                 markov_boundary_matrix[var_y, var_z] = False
                 markov_boundary_matrix[var_z, var_y] = False
-                skip_check[var_y] = False
-                skip_check[var_z] = False
+
+                if skip_check is not None:
+                    skip_check[var_y] = False
+                    skip_check[var_z] = False

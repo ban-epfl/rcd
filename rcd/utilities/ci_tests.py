@@ -41,12 +41,12 @@ def get_perfect_ci_test(adj_mat: np.ndarray):
     return perfect_ci_test
 
 
-def fisher_z(x_name: str, y_name: str, s: List[str], data_df: pd.DataFrame, significance_level=0.01) -> bool:
+def fisher_z(x_name: str, y_name: str, s: List[str], data, significance_level=0.01) -> bool:
     """
     Test for conditional independence between variables X and Y given a set Z in dataset D.
 
     Parameters:
-    D (numpy.ndarray): A matrix of data with size n*p, where n is the number of samples and p is the number of variables.
+    D (numpy.ndarray): A matrix of data with size num_sample*p, where num_sample is the number of samples and p is the number of variables.
     X (int): Index of the first variable (zero-based indexing).
     Y (int): Index of the second variable (zero-based indexing).
     Z (List[int]): A list of indices for variables in the conditioning set (zero-based indexing).
@@ -56,14 +56,17 @@ def fisher_z(x_name: str, y_name: str, s: List[str], data_df: pd.DataFrame, sign
     """
 
     # Number of samples
-    n = data_df.shape[0]
+    num_sample = data.shape[0]
 
     # Select columns corresponding to X, Y, and Z from the dataset
-    data_mat = data_df[[x_name, y_name] + s]
+    if isinstance(data, pd.DataFrame):
+        data_mat = data[[x_name, y_name] + s]
+    else:
+        data_mat = data[:, [x_name, y_name] + s]
 
     # Compute the precision matrix
     R = np.corrcoef(data_mat, rowvar=False)
-    P = np.linalg.inv(R)
+    P = np.linalg.pinv(R)
 
     # Calculate the partial correlation coefficient and Fisher Z-transform
     ro = -P[0, 1] / np.sqrt(P[0, 0] * P[1, 1])
@@ -71,7 +74,7 @@ def fisher_z(x_name: str, y_name: str, s: List[str], data_df: pd.DataFrame, sign
 
     # Test for conditional independence
     c = stats.norm.ppf(1 - significance_level / 2)
-    if abs(zro) < c / np.sqrt(n - len(s) - 3):
+    if abs(zro) < c / np.sqrt(num_sample - len(s) - 3):
         return True
     else:
         return False

@@ -1,3 +1,5 @@
+import numpy as np
+
 from rcd.utilities.utils import *
 
 """
@@ -40,7 +42,7 @@ class _RSLBase:
                 entry is True if the jth variable is in the Markov boundary of the ith variable, and False otherwise.
         """
         if find_markov_boundary_matrix_fun is None:
-            self.find_markov_boundary_matrix = lambda data: find_markov_boundary_matrix(data, ci_test)
+            self.find_markov_boundary_matrix = compute_mb_gaussian
         else:
             self.find_markov_boundary_matrix = find_markov_boundary_matrix_fun
 
@@ -55,7 +57,7 @@ class _RSLBase:
         self.is_rsl_d = False
         self.clique_num = None
 
-    def learn_and_get_skeleton(self, data: np.ndarray, clique_num: int = None) -> nx.Graph:
+    def learn_and_get_skeleton(self, data: np.ndarray, clique_num: int = None, return_r_order=False) -> nx.Graph:
         """
         Run the RSL algorithm on the data to learn and return the learned skeleton graph.
 
@@ -84,8 +86,9 @@ class _RSLBase:
 
         var_arr = np.arange(self.num_vars)
         var_left_bool_arr = np.ones(self.num_vars, dtype=bool)  # if ith position is True, indicates that i is left
-
-        for _ in range(self.num_vars - 1):
+        if return_r_order:
+            r_order = np.zeros(self.num_vars, dtype=int)
+        for i in range(self.num_vars - 1):
             # only consider variables that are left and have skip check set to False
             var_to_check_arr = var_arr[var_left_bool_arr & ~self.skip_rem_check_vec]
 
@@ -109,8 +112,12 @@ class _RSLBase:
             neighbors = self.find_neighborhood(removable_var)
 
             # update the markov boundary matrix
-            update_markov_boundary_matrix(self.markov_boundary_matrix, self.skip_rem_check_vec,
-                                          data_included_ci_test, removable_var, neighbors, self.is_rsl_d)
+            update_markov_boundary_matrix(self.markov_boundary_matrix,
+                                          data_included_ci_test,
+                                          removable_var,
+                                          neighbors,
+                                          self.is_rsl_d,
+                                          skip_check=self.skip_rem_check_vec)
 
             # add edges between the removable variable and its neighbors
             for neighbor_idx in neighbors:
@@ -118,7 +125,12 @@ class _RSLBase:
 
             # remove the removable variable from the set of variables left
             var_left_bool_arr[removable_var] = False
+            if return_r_order:
+                r_order[i] = removable_var
 
+        if return_r_order:
+            r_order[-1] = var_arr[var_left_bool_arr][0]
+            return r_order
         self.learned_skeleton = skeleton
         return skeleton
 

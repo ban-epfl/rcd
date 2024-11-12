@@ -1,9 +1,10 @@
 import time
+import timeit
 
 from rcd import rsl_d
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges, markov_boundary_gaussian
+from rcd.utilities.utils import f1_score_edges, compute_mb_gaussian
 
 if __name__ == '__main__':
     """
@@ -16,19 +17,25 @@ if __name__ == '__main__':
 
     # generate a random Erdos-Renyi DAG
     np.random.seed(2308)
-    n = 50
-    p = n ** (-0.85)
+    n = 100
+    p = np.log(n) /n
     adj_mat = gen_er_dag_adj_mat(n, p)
 
     # generate data from the DAG
     data_df = gen_gaussian_data(adj_mat, 20 * n)
 
     # run rsl-D
-    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
+    cond_set_size_list = []
 
-    starting_time = time.time()
+    def ci_test(x, y, z, data):
+        cond_set_size_list.append(len(z))
+        return fisher_z(x, y, z, data, significance_level=0.01)
+
+    starting_time = time.process_time()
     learned_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_df)
-    print("Time taken for rsl-D: ", time.time() - starting_time)
+    print("Time taken for rsl-D: ", time.process_time() - starting_time)
+
+    print("Cond set size: ", len(cond_set_size_list))
 
     # compare the learned skeleton to the true skeleton
     true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)

@@ -4,7 +4,7 @@ import networkx as nx
 from typing import Callable, List
 
 from .rsl_base import _RSLBase
-
+from ..utilities.utils import sanitize_data
 
 """
 This file contains the implementation for the rsl-W algorithm learning graphs with a bounded clique number from 
@@ -18,7 +18,7 @@ data, where the ith column contains samples from the ith variable, and returns a
 learned skeleton.
 """
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data_matrix: np.ndarray, clique_num: int,
+def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data, clique_num: int,
                            find_markov_boundary_matrix_fun=None) -> nx.Graph:
     """
     Learn the skeleton of a graph with a bounded clique number using the RSL-W algorithm.
@@ -34,6 +34,7 @@ def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], 
     Returns:
         nx.Graph: A networkx graph representing the learned skeleton.
     """
+    data_matrix = sanitize_data(data)
     rsl_w = _RSLBoundedClique(ci_test, find_markov_boundary_matrix_fun)
     learned_skeleton = rsl_w.learn_and_get_skeleton(data_matrix, clique_num)
     return learned_skeleton

@@ -15,7 +15,7 @@ contains samples from the ith variable, and returns a networkx graph representin
 """
 
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data_matrix: np.ndarray,
+def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data,
                            find_markov_boundary_matrix_fun=None) -> nx.Graph:
     """
     Learn the skeleton of a causal graph with latent variables using the L-MARVEL algorithm.
@@ -31,8 +31,10 @@ def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], 
     Returns:
         nx.Graph: A networkx graph representing the learned skeleton.
     """
+
+    data_mat = sanitize_data(data)
     l_marvel = _LMarvel(ci_test, find_markov_boundary_matrix_fun)
-    learned_skeleton = l_marvel.learn_and_get_skeleton(data_matrix)
+    learned_skeleton = l_marvel.learn_and_get_skeleton(data_mat)
     return learned_skeleton
 
 
@@ -69,7 +71,7 @@ class _LMarvel:
                     find_markov_boundary_matrix_fun(data: np.ndarray) -> np.ndarray.
         """
         if find_markov_boundary_matrix_fun is None:
-            self.find_markov_boundary_matrix = lambda data: find_markov_boundary_matrix(data, ci_test)
+            self.find_markov_boundary_matrix = compute_mb_gaussian
         else:
             self.find_markov_boundary_matrix = find_markov_boundary_matrix_fun
 
@@ -164,10 +166,10 @@ class _LMarvel:
             # Update the Markov boundary matrix
             update_markov_boundary_matrix(
                 self.markov_boundary_matrix,
-                self.skip_rem_check_vec,
                 data_included_ci_test,
                 removable_var,
                 neighbors,
+                skip_check=self.skip_rem_check_vec,
             )
 
         return self.learned_skeleton

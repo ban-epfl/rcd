@@ -4,6 +4,7 @@ import networkx as nx
 import numpy as np
 
 from rcd.rsl.rsl_base import _RSLBase
+from rcd.utilities.utils import sanitize_data
 
 """
 This file contains the implementation for the rsl-D algorithm learning diamond-free graphs from i.i.d. samples. 
@@ -18,7 +19,7 @@ learned skeleton.
 """
 
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data_matrix: np.ndarray,
+def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data,
                            find_markov_boundary_matrix_fun=None) -> nx.Graph:
     """
     Learn the skeleton of a diamond-free graph using the RSL-D algorithm.
@@ -33,6 +34,7 @@ def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], 
     Returns:
         nx.Graph: A networkx graph representing the learned skeleton.
     """
+    data_matrix = sanitize_data(data)
     rsl_d = _RSLDiamondFree(ci_test, find_markov_boundary_matrix_fun)
     learned_skeleton = rsl_d.learn_and_get_skeleton(data_matrix)
     return learned_skeleton

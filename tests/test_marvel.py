@@ -1,4 +1,4 @@
-from rcd import l_marvel
+from rcd import marvel
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
 from rcd.utilities.utils import f1_score_edges, compute_mb
@@ -6,7 +6,7 @@ from rcd.utilities.utils import f1_score_edges, compute_mb
 
 def test_with_data():
     """
-    Test L-Marvel on multiple random graphs with data and the Fisher Z test. We expect L-MARVEL to achieve a very
+    Test on multiple random graphs with data and the Fisher Z test. We expect L-MARVEL to achieve a very
     high F1 score.
     """
 
@@ -27,7 +27,7 @@ def test_with_data():
         ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=1 / n ** 2)
 
         # run l-marvel
-        learned_skeleton = l_marvel.learn_and_get_skeleton(ci_test, data_df)
+        learned_skeleton = marvel.learn_and_get_skeleton(ci_test, data_df)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
@@ -35,7 +35,7 @@ def test_with_data():
         # compute F1 score
         precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
         assert f1_score >= 0.94, "F1 score of " + str(f1_score) + " for graph " + str(i) + " should be 1!"
-    print("L-MARVEL passed the second test!")
+    print("MARVEL passed the second test!")
 
 
 def test_with_perfect_ci():
@@ -56,7 +56,7 @@ def test_with_perfect_ci():
 
         ci_test = get_perfect_ci_test(adj_mat)
         find_markov_boundary_matrix_fun = lambda data: compute_mb(data, ci_test)
-        learned_skeleton = l_marvel.learn_and_get_skeleton(ci_test, data_df, find_markov_boundary_matrix_fun)
+        learned_skeleton = marvel.learn_and_get_skeleton(ci_test, data_df, find_markov_boundary_matrix_fun)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
@@ -64,4 +64,4 @@ def test_with_perfect_ci():
         # compute F1 score
         precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
         assert f1_score == 1, "F1 score of " + str(f1_score) + " for graph " + str(i) + " should be 1!"
-    print("L-MARVEL passed the second test!")
+    print("MARVEL passed the second test!")
