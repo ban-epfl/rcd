@@ -64,7 +64,8 @@ def test_with_data():
         data_mat = data_df.to_numpy()
 
         # run rsl-D
-        ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=1 / n ** 2)
+        # ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=1 / n ** 2)
+        ci_test = get_perfect_ci_test(adj_mat)
         rsl_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_mat)
 
         # run rol-hc
