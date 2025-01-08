@@ -1,8 +1,6 @@
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-
-from rcd.l_marvel.l_marvel import LMarvel
-from rcd.marvel.marvel import Marvel
+from rcd import marvel
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
 from rcd.utilities.utils import f1_score_edges
@@ -40,10 +38,9 @@ if __name__ == '__main__':
 
         perfect_ci_test = get_perfect_ci_test(adj_mat)
         ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.05)
-        marvel = Marvel(ci_test)
 
         # run l-marvel
-        learned_skeleton = marvel.learn_and_get_skeleton(data_df)
+        learned_skeleton = marvel.learn_and_get_skeleton(ci_test, data_df)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)

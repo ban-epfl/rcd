@@ -1,8 +1,7 @@
 import networkx as nx
 from matplotlib import pyplot as plt
 
-from rcd.rsl.rsl_d import RSLDiamondFree
-from rcd.rsl.rsl_w import RSLBoundedClique
+from rcd import rsl_w
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
 from rcd.utilities.utils import f1_score_edges, get_clique_number
@@ -19,7 +18,7 @@ if __name__ == '__main__':
     # generate a random DAG
     np.random.seed(23429)
     n = 10
-    p = n ** (-0.5)
+    p = np.log(n) / n
     adj_mat = gen_er_dag_adj_mat(n, p)
 
     # draw graph
@@ -35,13 +34,11 @@ if __name__ == '__main__':
     # generate data from the DAG
     data_df = gen_gaussian_data(adj_mat, 1000)
 
-    # run rsl-D
+    # run rsl-w
     ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
-    ci_test = get_perfect_ci_test(adj_mat)
-    rsl_d = RSLBoundedClique(ci_test)
-    # rsl_d = RSLDiamondFree(ci_test)
+    # ci_test = get_perfect_ci_test(adj_mat)
 
-    learned_skeleton = rsl_d.learn_and_get_skeleton(data_df, clique_number)
+    learned_skeleton = rsl_w.learn_and_get_skeleton(ci_test, data_df, clique_number)
 
     # draw learned skeleton
     nx.draw(learned_skeleton, with_labels=True)

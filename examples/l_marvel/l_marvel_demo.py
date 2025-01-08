@@ -1,9 +1,8 @@
 from tqdm import tqdm
-
-from rcd.l_marvel.l_marvel import LMarvel
+from rcd import l_marvel
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges, find_markov_boundary_matrix
+from rcd.utilities.utils import f1_score_edges
 
 if __name__ == '__main__':
     """
@@ -14,14 +13,15 @@ if __name__ == '__main__':
 
     # generate a random Erdos-Renyi DAG
     # np.random.seed(2308)
-    n = 50
-    p = n ** (-0.9)
+    n = 20
+    p = 0.1
+    num_rep = 1
 
 
     rng = np.random.default_rng(2308)
-    for i in tqdm(range(10)):
-        seed = rng.integers(100000)
-        # seed = 10925
+    for i in tqdm(range(num_rep)):
+        # seed = rng.integers(100000)
+        seed = 10925
         np.random.seed(seed)
         adj_mat = gen_er_dag_adj_mat(n, p)
 
@@ -30,16 +30,16 @@ if __name__ == '__main__':
         # plt.show()
 
         # generate data from the DAG
-        data_df = gen_gaussian_data(adj_mat, 10000)
+        data_df = gen_gaussian_data(adj_mat, 20 * n)
 
-        ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
+        ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=1 / n ** 2)
         ci_test_mk = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-        find_markov_boundary_matrix_fun = lambda data: find_markov_boundary_matrix(data, ci_test_mk)
+
         # ci_test = get_perfect_ci_test(adj_mat)
-        l_marvel = LMarvel(ci_test, find_markov_boundary_matrix_fun)
+        # find_markov_boundary_matrix_fun = lambda data: find_markov_boundary_matrix(data, ci_test)
 
         # run l-marvel
-        learned_skeleton = l_marvel.learn_and_get_skeleton(data_df)
+        learned_skeleton = l_marvel.learn_and_get_skeleton(ci_test, data_df)
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
@@ -47,9 +47,8 @@ if __name__ == '__main__':
         # compute F1 score
         precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
 
-        if f1_score != 1:
-            print("Precision: ", precision)
-            print("Recall: ", recall)
-            print("F1 score: ", f1_score)
-            print("seed: ", seed)
+        print("Precision: ", precision)
+        print("Recall: ", recall)
+        print("F1 score: ", f1_score)
+        print("seed: ", seed)
 

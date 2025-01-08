@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.0] - 2024-11-12
+- Refactored all algorithms to not require instantiation of a class.
+- Fixed multiple bugs in the algorithms.
+- 
+
 ## [0.1.3] - 2024-07-10
 ### Fixed
 - Changed to stable sort in RSL

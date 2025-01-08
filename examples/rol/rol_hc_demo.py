@@ -2,12 +2,11 @@ import time
 
 import networkx as nx
 
-from rcd.rol.rol_hc import ROLHillClimb
-from rcd.rsl.rsl_d import RSLDiamondFree
-from rcd.rsl.rsl_w import RSLBoundedClique
+from rcd import rol_hc
+from rcd import rsl_d
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges
+from rcd.utilities.utils import f1_score_edges, compute_mb, compute_mb_gaussian
 
 
 def get_clique_number(graph: nx.Graph):
@@ -26,41 +25,41 @@ if __name__ == '__main__':
     """
 
     # generate a random DAG
-    np.random.seed(23429)
-    n = 20
-    p = np.log(n) / n * 3
+    np.random.seed(1234)
+    n = 50
+    p =  np.log(n) / n
     adj_mat = gen_er_dag_adj_mat(n, p)
 
     # get graph clique number
     graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph).to_undirected()
 
     # generate data from the DAG
-    data_df = gen_gaussian_data(adj_mat, 2000)
+    data_df = gen_gaussian_data(adj_mat, 50000)
 
     # run rsl-D
-    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
-
+    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.001)
 
     # ci_test = get_perfect_ci_test(adj_mat)
+    find_mb_fun = lambda x: compute_mb_gaussian(x, sig_level=0.001)
+    # find_mb_fun = None
 
-    # rsl_d = RSLDiamondFree(ci_test)
-    # starting_time = time.time()
-    # learned_skeleton_rsl_d = rsl_d.learn_and_get_skeleton(data_df)
-    # print("Time taken for rsl-D: ", time.time() - starting_time)
-
-    rol_hc = ROLHillClimb(ci_test, max_iters=10, max_swaps=5)
     starting_time = time.time()
-    learned_skeleton_rol_hc = rol_hc.learn_and_get_skeleton(data_df)
-    print("Time taken for rol-hc: ", time.time() - starting_time)
+    learned_skeleton_rsl_d = rsl_d.learn_and_get_skeleton(ci_test, data_df, find_markov_boundary_matrix_fun=find_mb_fun)
+    print("Time taken for rsl-D: ", time.time() - starting_time)
+
+    starting_time = time.process_time()
+    learned_skeleton_rol_hc = rol_hc.learn_and_get_skeleton(ci_test, data_df, max_iters=10, max_swaps=10,
+                                                            find_markov_boundary_matrix_fun=find_mb_fun)
+    print("Time taken for rol-hc: ", time.process_time() - starting_time)
 
     # compare the learned skeleton to the true skeleton
     true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
 
     # compute F1 score
-    # precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton_rsl_d, return_only_f1=False)
-    # print("F1 score for rsl-D: ", f1_score)
-    # print("Precision for rsl-D: ", precision)
-    # print("Recall for rsl-D: ", recall)
+    precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton_rsl_d, return_only_f1=False)
+    print("F1 score for rsl-D: ", f1_score)
+    print("Precision for rsl-D: ", precision)
+    print("Recall for rsl-D: ", recall)
 
     precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton_rol_hc, return_only_f1=False)
     print("\nF1 score for rol-hc: ", f1_score)

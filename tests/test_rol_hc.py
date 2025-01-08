@@ -1,75 +1,73 @@
-# from rcd import ROLHillClimb
-# from rcd.utilities.ci_tests import *
-# from rcd.utilities.data_graph_generation import *
-# from rcd.utilities.utils import f1_score_edges, get_clique_number, find_markov_boundary_matrix
-#
-#
-# def test_with_data():
-#     """
-#     Test ROL-HC on random ER graphs, initializing the r-order with RSL-D. We expect it to beat RSL-D in terms of F1 score.
-#     """
-#
-#     n = 30
-#     p = 2 * np.log(n) / n
-#
-#     num_graphs_to_test = 10
-#     np.random.seed(2308)
-#     for i in range(num_graphs_to_test):
-#         # generate a random Erdos-Renyi DAG
-#         adj_mat = gen_er_dag_adj_mat(n, p)
-#
-#         # get graph clique number
-#         graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph).to_undirected()
-#
-#         # generate data from the DAG (unused as we use a perfect CI test)
-#         data_df = gen_gaussian_data(adj_mat, 2000)
-#
-#         # run l-marvel
-#         ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=0.01)
-#         ci_test_mk = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-#         find_markov_boundary_matrix_fun = lambda data: find_markov_boundary_matrix(data, ci_test_mk)
-#         l_marvel = LMarvel(ci_test, find_markov_boundary_matrix_fun)
-#
-#         # run l-marvel
-#         learned_skeleton = l_marvel.learn_and_get_skeleton(data_df)
-#
-#         # compare the learned skeleton to the true skeleton
-#         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
-#
-#         # compute F1 score
-#         precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-#         assert f1_score >= 0.95, "F1 score of " + str(f1_score) + " for graph " + str(i) + " should be 1!"
-#     print("L-MARVEL passed the second test!")
-#
-#
-# def test_with_perfect_ci():
-#     """
-#     Test RSL-W on 100 random ER graphs with known clique numbers. We expect it to get a perfect F1 score with perfect CI tests.
-#     """
-#     n = 20
-#     p = 2 * np.log(n) / n
-#
-#     num_graphs_to_test = 10
-#     np.random.seed(2308)
-#     for i in range(num_graphs_to_test):
-#         # generate a random Erdos-Renyi DAG
-#         adj_mat = gen_er_dag_adj_mat(n, p)
-#
-#         # get graph clique number
-#         graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph).to_undirected()
-#
-#         # generate data from the DAG (unused as we use a perfect CI test)
-#         data_df = gen_gaussian_data(adj_mat, 1)
-#
-#         # run rsl-D
-#         ci_test = get_perfect_ci_test(adj_mat)
-#         rsl_w = LMarvel(ci_test)
-#         learned_skeleton = rsl_w.learn_and_get_skeleton(data_df)
-#
-#         # compare the learned skeleton to the true skeleton
-#         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
-#
-#         # compute F1 score
-#         precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-#         assert f1_score == 1, "F1 score of " + str(f1_score) + " for graph " + str(i) + " should be 1!"
-#     print("L-MARVEL passed the second test!")
+from rcd import rsl_d
+from rcd import rol_hc
+from rcd.utilities.ci_tests import *
+from rcd.utilities.data_graph_generation import *
+from rcd.utilities.utils import f1_score_edges
+
+
+def test_with_perf_ci():
+    """
+    ROL-HC should do at least as better as RSL-D with perfect CI tests (because it is initialized with RSL-D).
+    """
+
+    # generate a random Erdos-Renyi DAG
+    np.random.seed(2308)
+    n = 15
+    p = 0.3
+    num_repeats = 10
+
+    for _ in range(num_repeats):
+        adj_mat = gen_er_dag_adj_mat(n, p)
+
+        # generate data from the DAG
+        data_df = gen_gaussian_data(adj_mat, 1000)
+        data_mat = data_df.to_numpy()
+
+        # run rsl-D
+        # ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
+        ci_test = get_perfect_ci_test(adj_mat)
+        learned_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_mat)
+
+        # compare the learned skeleton to the true skeleton
+        true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
+
+        # compute F1 score
+        _, _, rsl_f1 = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
+        # print(f"RSL-D F1 Score: {rsl_f1}")
+
+        # run rol-hc
+        learned_skeleton = rol_hc.learn_and_get_skeleton(ci_test, data_mat, 5, 5)
+
+        # compute F1 score
+        _, _, rol_f1 = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
+        # print(f"ROL-HC F1 Score: {rol_f1}")
+
+        assert rol_f1 >= rsl_f1, "ROL-HC should have an F1 score at least as good as RSL-D!"
+
+
+def test_with_data():
+    """
+    ROL-HC learned skeleton should ALWAYS have at most as many edges as RSL-D learned skeleton.
+    """
+
+    # generate a random Erdos-Renyi DAG
+    np.random.seed(2308)
+    n = 10
+    p = np.log(n) / n
+    num_repeats = 5
+
+    for _ in range(num_repeats):
+        adj_mat = gen_er_dag_adj_mat(n, p)
+
+        # generate data from the DAG
+        data_df = gen_gaussian_data(adj_mat, n*50)
+        data_mat = data_df.to_numpy()
+
+        # run rsl-D
+        ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=1 / n ** 2)
+        rsl_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_mat)
+
+        # run rol-hc
+        rol_skeleton = rol_hc.learn_and_get_skeleton(ci_test, data_mat, 5, 5)
+
+        assert len(rol_skeleton.edges()) <= len(rsl_skeleton.edges()), "ROL-HC should have at most as many edges as RSL-D!"
