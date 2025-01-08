@@ -2,7 +2,6 @@ from rcd import rsl_w
 from rcd.utilities.ci_tests import *
 from rcd.utilities.data_graph_generation import *
 from rcd.utilities.utils import f1_score_edges, get_clique_number, compute_mb
-from rcd_julia import find_markov_boundary_matrix
 
 
 def test_with_data():

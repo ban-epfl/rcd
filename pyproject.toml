@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rcd"
-version = "0.2.0"
+version = "0.2.1"
 description = "Recursive causal discovery framework"
 authors = ["sepehr78 <elahisepehr@gmail.com>"]
 readme = "README.md"
@@ -16,9 +16,9 @@ tqdm = "^4"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.1"
 mkdocs = "^1.5.3"
-mkdocs-material = "^9.5.10"
-mkdocstrings = {extras = ["python"], version = "^0.24.0"}
-mkdocs-section-index = "^0.3.8"
+mkdocs-material = "^9.5"
+mkdocstrings = {extras = ["python"], version = "^0.27"}
+mkdocs-section-index = "^0.3"
 h5py = "^3.10.0"
 joblib = "^1.3.2"
 matplotlib = "^3.4.3"
