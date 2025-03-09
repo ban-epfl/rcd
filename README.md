@@ -38,10 +38,11 @@ pip install rcd
 The following snipped creates a random directed acyclic graph (DAG) and generates Gaussian data from it. Then, it uses one of the algorithms provided in our package, RSL-D, to learn the skeleton of the DAG from the data. Finally, it compares the learned skeleton to the true skeleton and computes the F1 score based on the edges.
 
 ```python
-from rcd import RSLDiamondFree
-from rcd.utilities.ci_tests import *
+from rcd import rsl_d
+from rcd.utilities.ci_tests import fisher_z
 from rcd.utilities.data_graph_generation import *
 from rcd.utilities.utils import f1_score_edges
+import networkx as nx
 
 n = 100
 p = n ** (-0.85)
@@ -52,9 +53,8 @@ data_df = gen_gaussian_data(adj_mat, 1000)
 
 # run rsl-D
 ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-rsl_d = RSLDiamondFree(ci_test)
 
-learned_skeleton = rsl_d.learn_and_get_skeleton(data_df)
+learned_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_df)
 
 # compare the learned skeleton to the true skeleton
 true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
