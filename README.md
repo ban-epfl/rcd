@@ -7,17 +7,21 @@ This package provides efficient implementations of algorithms that recursively l
 ## How to cite:
 If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
 
-Mokhtarian, Ehsan, Sepehr Elahi, Sina Akbari, and Negar Kiyavash. "Recursive Causal Discovery." arXiv preprint arXiv:2403.09300 (2024).
+*Mokhtarian, E., Elahi, S., Akbari, S., & Kiyavash, N. (2025). Recursive causal discovery. Journal of Machine Learning Research, 26(61), 1-65.*
 
-Link to the paper: [arXiv](https://arxiv.org/abs/2403.09300) 
+Link to the paper: [Journal of Machine Learning Research](https://www.jmlr.org/papers/v26/24-0384.html) 
 
 BibTeX entry:
 ```bibtex
-@article{mokhtarian2024recursive,
-  title={Recursive Causal Discovery},
-  author={Mokhtarian, Ehsan and Elahi, Sepehr and Akbari, Sina and Kiyavash, Negar},
-  journal={arXiv preprint arXiv:2024},
-  year={2024}
+@article{JMLR:v26:24-0384,
+  author  = {Ehsan Mokhtarian and Sepehr Elahi and Sina Akbari and Negar Kiyavash},
+  title   = {Recursive Causal Discovery},
+  journal = {Journal of Machine Learning Research},
+  year    = {2025},
+  volume  = {26},
+  number  = {61},
+  pages   = {1--65},
+  url     = {http://jmlr.org/papers/v26/24-0384.html}
 }
 ```
 
