@@ -114,7 +114,7 @@ class _ROLHillClimb:
         if initial_r_order is None:
             # Set r-order by running RSL-D
             rol_init = _RSLDiamondFree(self.ci_test, self.find_markov_boundary_matrix)
-            initial_r_order = rol_init.learn_and_get_skeleton(self.data,  return_r_order=True)
+            initial_r_order = rol_init.compute_removal_order(self.data)
 
         # Find the best r-order and then learn the skeleton using it
         curr_r_order = np.copy(initial_r_order)
