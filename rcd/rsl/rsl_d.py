@@ -1,4 +1,9 @@
-from typing import Callable, List
+"""Recursive Skeleton Learning for diamond-free graphs (RSL-D)."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import networkx as nx
 import numpy as np
@@ -6,34 +11,34 @@ import numpy as np
 from rcd.rsl.rsl_base import _RSLBase
 from rcd.utilities.utils import sanitize_data
 
-"""
-This file contains the implementation for the rsl-D algorithm learning diamond-free graphs from i.i.d. samples. 
-The class is initialized with a conditional independence test function, which determines whether two variables are 
-independent given another set of variables, using the data provided. For examples of possible conditional 
-independence tests, see utilities/ci_tests.py. For details on how to write a custom CI test function, look at the 
-constructor (init function) of the RSLBase class.
-
-The class has a learn_and_get_skeleton function, inherited from the base class, that takes in a Pandas DataFrame of 
-data, where the ith column contains samples from the ith variable, and returns a networkx graph representing the 
-learned skeleton.
-"""
+if TYPE_CHECKING:
+    import pandas as pd
 
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data,
-                           find_markov_boundary_matrix_fun=None) -> nx.Graph:
+def learn_and_get_skeleton(
+    ci_test: Callable[[int, int, list[int], np.ndarray], bool],
+    data: np.ndarray | "pd.DataFrame",
+    find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] | None = None,
+) -> nx.Graph:
+    """Learn a skeleton for a diamond-free graph using RSL-D.
+
+    Parameters
+    ----------
+    ci_test : Callable[[int, int, list[int], np.ndarray], bool]
+        Conditional independence test that accepts the indices of two variables,
+        a conditioning set, and the full data matrix.
+    data : ndarray or pandas.DataFrame
+        Observational dataset shaped ``(n_samples, n_vars)``.
+    find_markov_boundary_matrix_fun : Callable[[np.ndarray], np.ndarray], optional
+        Optional custom routine for estimating the Markov boundary matrix. When
+        omitted, the default Gaussian estimator is used.
+
+    Returns
+    -------
+    nx.Graph
+        Learned undirected skeleton.
     """
-    Learn the skeleton of a diamond-free graph using the RSL-D algorithm.
 
-    Args:
-        ci_test (Callable[[int, int, List[int], np.ndarray], bool]): A conditional independence test function that takes in the indices of two variables
-                                and a list of variable indices as the conditioning set, and returns True if the two
-                                variables are independent given the conditioning set, and False otherwise.
-        data_matrix (np.ndarray): The data matrix with shape (num_samples, num_vars), where each column corresponds
-                                  to a variable and each row corresponds to a sample.
-
-    Returns:
-        nx.Graph: A networkx graph representing the learned skeleton.
-    """
     data_matrix = sanitize_data(data)
     rsl_d = _RSLDiamondFree(ci_test, find_markov_boundary_matrix_fun)
     learned_skeleton = rsl_d.learn_and_get_skeleton(data_matrix)
@@ -41,42 +46,44 @@ def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], 
 
 
 class _RSLDiamondFree(_RSLBase):
-    """
-    Implementation for the RSL-D algorithm for learning diamond-free graphs from i.i.d. samples.
+    """Specialization of :class:`_RSLBase` for diamond-free graphs."""
 
-    This class is initialized with a conditional independence test function, which determines whether two variables are
-    independent given another set of variables, using the data provided.
+    def __init__(
+        self,
+        ci_test: Callable[[int, int, list[int], np.ndarray], bool],
+        find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] | None = None,
+    ) -> None:
+        """Configure the diamond-free learner.
 
-    The class has a learn_and_get_skeleton function that takes in a data matrix (numpy array), where each column
-    corresponds to a variable and each row corresponds to a sample, and returns a networkx graph representing the
-    learned skeleton.
-    """
-
-    def __init__(self, ci_test: Callable[[int, int, List[int], np.ndarray], bool], find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] = None):
+        Parameters
+        ----------
+        ci_test : Callable[[int, int, list[int], np.ndarray], bool]
+            Conditional independence oracle supplied by the caller.
+        find_markov_boundary_matrix_fun : Callable[[np.ndarray], np.ndarray], optional
+            Alternative Markov-boundary estimator. Falls back to the Gaussian
+            estimator when ``None``.
         """
-        Initialize the RSL-D algorithm with the conditional independence test to use.
 
-        Args:
-            ci_test (Callable[[int, int, List[int], np.ndarray], bool]): A conditional independence test function that takes in the indices of two variables
-                                and a list of variable indices as the conditioning set, and returns True if the two
-                                variables are independent given the conditioning set, and False otherwise.
-            find_markov_boundary_matrix_fun (Callable[[np.ndarray], np.ndarray], optional): A function to find the Markov boundary matrix.
-                This function should take in a numpy array of data, and return a 2D numpy array, where the (i, j)th
-                entry is True if the jth variable is in the Markov boundary of the ith variable, and False otherwise.
-        """
         super().__init__(ci_test, find_markov_boundary_matrix_fun)
         self.is_rsl_d = True
 
     def find_neighborhood(self, var: int) -> np.ndarray:
-        """
-        Find the neighborhood of a variable using Proposition 40.
+        """Return the neighborhood of ``var`` via Proposition 40.
 
-        Args:
-            var (int): The variable whose neighborhood we want to find.
+        Parameters
+        ----------
+        var : int
+            Variable whose neighbors should be retrieved.
 
-        Returns:
-            np.ndarray: 1D numpy array containing the variables in the neighborhood.
+        Returns
+        -------
+        np.ndarray
+            Indices of the neighbors of ``var``.
         """
+
+        if self.markov_boundary_matrix is None or self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
+
         var_mk_bool_arr = self.markov_boundary_matrix[var]
         var_mk_arr = np.flatnonzero(var_mk_bool_arr)
         var_mk_set = set(var_mk_arr)
@@ -102,15 +109,22 @@ class _RSLDiamondFree(_RSLBase):
         return neighbor_arr
 
     def is_removable(self, var: int) -> bool:
-        """
-        Check whether a variable is removable using Theorem 39.
+        """Check whether ``var`` is removable via Theorem 39.
 
-        Args:
-            var (int): The variable to check.
+        Parameters
+        ----------
+        var : int
+            Variable to check for removability.
 
-        Returns:
-            bool: True if the variable is removable, False otherwise.
+        Returns
+        -------
+        bool
+            ``True`` when the variable can be safely removed.
         """
+
+        if self.markov_boundary_matrix is None or self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
+
         var_mk_bool_arr = self.markov_boundary_matrix[var]
         var_mk_arr = np.flatnonzero(var_mk_bool_arr)
         var_mk_set = set(var_mk_arr)
@@ -125,3 +139,4 @@ class _RSLDiamondFree(_RSLBase):
                 if self.ci_test(var_y, var_z, cond_set, self.data):
                     return False
         return True
+
