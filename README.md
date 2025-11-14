@@ -1,17 +1,115 @@
-# Welcome to RCD
+# Recursive Causal Discovery (RCD)
 
-`RCD` is a Python library for Recursive Causal Discovery.
-This package provides efficient implementations of algorithms that recursively learn a causal graph from observational data.
-`RCD` focuses on user-friendliness with a well-documented and uniform interface. Moreover, its modular design allows for the integration and expansion of other algorithms and models within the package.
+> Fast, principled graph discovery for causal scientists and ML practitioners, powered by the algorithms in *Recursive Causal Discovery* (JMLR 2025).
 
-## How to cite:
-If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
+RCD is a batteries-included Python toolkit for learning causal skeletons from observational data. It ships the exact implementations from our [JMLR paper](https://www.jmlr.org/papers/v26/24-0384.html)—RSL-D/W, L-MARVEL, MARVEL, and the ROL hill-climbing refinements—plus the utilities you need to drop them into real pipelines: conditional-independence (CI) tests, Markov-boundary estimators, synthetic-data generators, and ready-to-run demos.
 
-*Mokhtarian, E., Elahi, S., Akbari, S., & Kiyavash, N. (2025). Recursive causal discovery. Journal of Machine Learning Research, 26(61), 1-65.*
+<p align="center">
+  <b>Install</b><br>
+  <code>pip install rcd</code>
+</p>
 
-Link to the paper: [Journal of Machine Learning Research](https://www.jmlr.org/papers/v26/24-0384.html) 
+## Table of Contents
 
-BibTeX entry:
+1. [Highlights](#highlights)
+2. [Algorithms inside](#algorithms-inside)
+3. [Quickstart](#quickstart)
+4. [Choose your CI test](#choose-your-ci-test)
+5. [Demos & docs](#demos--docs)
+6. [Roadmap & contributing](#roadmap--contributing)
+7. [How to cite](#how-to-cite)
+8. [License](#license)
+
+## Highlights
+
+- **State-of-the-art guarantees** – Implementations follow the proofs and numbering of *Recursive Causal Discovery* (JMLR 26:61) verbatim.
+- **Swappable CI tests** – Fisher-Z, Pearson residuals, a battery of power-divergence tests, or your own callable with signature `(x_idx, y_idx, cond_set, data)`.
+- **Markov-boundary aware** – Efficient Gaussian estimators out of the box plus hooks for custom routines.
+- **Examples that actually run** – Each algorithm ships with a runnable script in `examples/` demonstrating realistic settings and reporting precision/recall/F1.
+- **Reproducible utilities** – Synthetic DAG generators, F1 helpers, clique-number estimation, and more so you can benchmark methods in minutes.
+
+## Algorithms inside
+
+| Module | Problem Setting | Notes |
+| --- | --- | --- |
+| `rcd.rsl.rsl_d` | Diamond-free graphs (RSL-D) | Recursive removal with Fisher-Z CI tests by default. |
+| `rcd.rsl.rsl_w` | Graphs with bounded clique number (RSL-W) | Requires clique-number upper bound; handles dense Markov boundaries. |
+| `rcd.l_marvel` | Latent MARVEL | Learns skeletons when latent confounders are present. |
+| `rcd.marvel` | MARVEL | Handles mixed observable/latent structures via v-structure reasoning. |
+| `rcd.rol.rol_hc` | Removal-order hill climbing (ROL-HC) | Warm-started by RSL-D and improves the ordering via local swaps. |
+
+Every algorithm exposes the same high-level API:
+
+```python
+learned_skeleton = algo.learn_and_get_skeleton(
+    ci_test=my_ci_function,
+    data=data_matrix_or_dataframe,
+    **optional_kwargs,
+)
+```
+
+`ci_test` is any callable with the signature `(x_idx: int, y_idx: int, cond_set: list[int], data: np.ndarray | pd.DataFrame) -> bool`, returning `True` when the variables are conditionally independent.
+
+## Quickstart
+
+```python
+import networkx as nx
+import numpy as np
+
+from rcd import rsl_d
+from rcd.utilities.ci_tests import fisher_z
+from rcd.utilities.data_graph_generation import gen_er_dag_adj_mat, gen_gaussian_data
+from rcd.utilities.utils import f1_score_edges
+
+np.random.seed(2308)
+n = 60
+p = n ** (-0.85)
+adj_mat = gen_er_dag_adj_mat(n, p)
+data = gen_gaussian_data(adj_mat, 5_000)
+
+ci_test = lambda x, y, z, d: fisher_z(x, y, z, d, significance_level=2 / n**2)
+learned = rsl_d.learn_and_get_skeleton(ci_test, data)
+
+true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
+precision, recall, f1 = f1_score_edges(true_skeleton, learned, return_only_f1=False)
+print(f"Precision={precision:.3f}, Recall={recall:.3f}, F1={f1:.3f}")
+```
+
+Want bound-clique graphs instead? Swap `rsl_d` for `rsl_w` and pass `clique_num=get_clique_number(nx_graph)`.
+
+## Choose your CI test
+
+All CI tests live under `rcd.utilities.ci_tests`:
+
+- `fisher_z` – Gaussian Fisher-Z test (default in our paper).
+- `pearsonr` – Partial correlation via linear regression residuals.
+- `chi_square`, `g_sq`, `freeman_tuckey`, `neyman`, `cressie_read`, `modified_log_likelihood` – members of the power-divergence family supporting discrete data.
+- `get_perfect_ci_test(adj_matrix)` – Oracle test derived from ground-truth adjacency, great for debugging.
+
+Because every test shares the same function signature you can mix and match without touching the algorithm code.
+
+## Demos & docs
+
+- **Run the demos** – `python examples/rsl/rsl_d_demo.py`, `python examples/l_marvel/l_marvel_demo.py`, etc. Each prints runtime plus precision/recall/F1, and the RSL-W demo even plots the learned skeleton.
+- **API reference** – See the module docstrings (`rcd/rsl/*.py`, `rcd/rol/rol_hc.py`, `rcd/l_marvel/l_marvel.py`) for NumPy-style documentation and theorem references tied to the JMLR paper.
+- **Website** – https://rcdpackage.com hosts rendered docs and tutorials.
+- **GitHub** – https://github.com/ban-epfl/rcd houses the full source, issues, and release history.
+
+## Roadmap & contributing
+
+We are actively working on:
+
+1. **Meek rule orientation** – Extending the recursive learners with Meek rules to orient as many edges as possible.
+2. **CPDAG outputs** – Returning completed partially directed acyclic graphs (CPDAGs) instead of bare skeletons.
+
+Pull requests are welcome—especially those that add new CI tests or improve coverage. Please open an issue describing the improvement, follow our NumPy-style typing/docstring conventions, and run `pytest` plus the relevant demos before submitting.
+
+## How to cite
+
+If you build on RCD, please cite our JMLR article:
+
+> Mokhtarian, E., Elahi, S., Akbari, S., & Kiyavash, N. (2025). Recursive Causal Discovery. *Journal of Machine Learning Research*, 26(61), 1–65. https://www.jmlr.org/papers/v26/24-0384.html
+
 ```bibtex
 @article{JMLR:v26:24-0384,
   author  = {Ehsan Mokhtarian and Sepehr Elahi and Sina Akbari and Negar Kiyavash},
@@ -21,59 +119,15 @@ BibTeX entry:
   volume  = {26},
   number  = {61},
   pages   = {1--65},
-  url     = {http://jmlr.org/papers/v26/24-0384.html}
+  url     = {https://www.jmlr.org/papers/v26/24-0384.html}
 }
 ```
 
-## GitHub:
-The source code is available on [GitHub](https://github.com/ban-epfl/rcd).
-
-## Website:
-Documentation are available on [RCD website](https://rcdpackage.com).
-
-## Installation
-The package is available on PyPI and can be installed using pip:
-
-```bash
-pip install rcd
-```
-
-## Basic usage
-The following snipped creates a random directed acyclic graph (DAG) and generates Gaussian data from it. Then, it uses one of the algorithms provided in our package, RSL-D, to learn the skeleton of the DAG from the data. Finally, it compares the learned skeleton to the true skeleton and computes the F1 score based on the edges.
-
-```python
-from rcd import rsl_d
-from rcd.utilities.ci_tests import fisher_z
-from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges
-import networkx as nx
-
-n = 100
-p = n ** (-0.85)
-adj_mat = gen_er_dag_adj_mat(n, p)
-
-# generate data from the DAG
-data_df = gen_gaussian_data(adj_mat, 1000)
-
-# run rsl-D
-ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-
-learned_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_df)
-
-# compare the learned skeleton to the true skeleton
-true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
-
-# compute F1 score
-precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-print(f'Precision: {precision}, Recall: {recall}, F1 score: {f1_score}')
-```
-
-
 ## License
 
-This project is provided under the BSD license.
+RCD is distributed under the BSD 2-Clause License.
 
-```
+```text
 BSD 2-Clause License
 
 Copyright (c) 2024, EPFL

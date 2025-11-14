@@ -1,17 +1,51 @@
-# Welcome to RCD
+# Recursive Causal Discovery
 
-`RCD` is a Python library for Recursive Causal Discovery.
-This package provides efficient implementations of algorithms that recursively learn a causal graph from observational data.
-`RCD` focuses on user-friendliness with a well-documented and uniform interface. Moreover, its modular design allows for the integration and expansion of other algorithms and models within the package.
+RCD is the reference implementation of the algorithms introduced in our JMLR paper [*Recursive Causal Discovery*](https://www.jmlr.org/papers/v26/24-0384.html) (2025). It bundles RSL-D/W, MARVEL, L-MARVEL, and the ROL hill-climbing refinements, along with CI tests, Markov-boundary utilities, and runnable demos.
 
-## How to cite:
-If you use `RCD` in a scientific publication, we would appreciate citations to the following paper:
+## Why RCD?
 
-Mokhtarian, Ehsan, Sepehr Elahi, Sina Akbari, and Negar Kiyavash. "Recursive Causal Discovery." arXiv preprint arXiv:2403.09300 (2024).
+- Proven guarantees that match the paper's numbering and notation.
+- Swappable conditional-independence tests—from Fisher-Z to chi-square families.
+- Ready-to-run demos in `examples/` plus reusable utilities for data generation and scoring.
 
-Link to the paper: [Journal of Machine Learning Research](https://www.jmlr.org/papers/v26/24-0384.html) 
+## Install
 
-BibTeX entry:
+```bash
+pip install rcd
+```
+
+## Quickstart
+
+```python
+from rcd import rsl_d
+from rcd.utilities.ci_tests import fisher_z
+from rcd.utilities.data_graph_generation import gen_er_dag_adj_mat, gen_gaussian_data
+from rcd.utilities.utils import f1_score_edges
+import networkx as nx
+import numpy as np
+
+np.random.seed(2308)
+n = 60
+p = n ** (-0.85)
+adj = gen_er_dag_adj_mat(n, p)
+data = gen_gaussian_data(adj, 5_000)
+
+ci = lambda x, y, z, d: fisher_z(x, y, z, d, significance_level=2 / n**2)
+learned = rsl_d.learn_and_get_skeleton(ci, data)
+true = nx.from_numpy_array(adj, create_using=nx.Graph)
+print(f1_score_edges(true, learned))
+```
+
+## Learn More
+
+- Browse the API docs for `rcd.rsl`, `rcd.marvel`, `rcd.l_marvel`, and `rcd.rol`.
+- Run `python examples/rsl/rsl_d_demo.py` (and friends) to see the algorithms in action.
+- Visit [rcdpackage.com](https://rcdpackage.com) for guides and tutorials, and star us on [GitHub](https://github.com/ban-epfl/rcd) to follow releases.
+
+## Citation
+
+If you use RCD, please cite:
+
 ```bibtex
 @article{JMLR:v26:24-0384,
   author  = {Ehsan Mokhtarian and Sepehr Elahi and Sina Akbari and Negar Kiyavash},
@@ -21,82 +55,12 @@ BibTeX entry:
   volume  = {26},
   number  = {61},
   pages   = {1--65},
-  url     = {http://jmlr.org/papers/v26/24-0384.html}
+  url     = {https://www.jmlr.org/papers/v26/24-0384.html}
 }
 ```
 
-## GitHub:
-The source code is available on [GitHub](https://github.com/ban-epfl/rcd).
-
-## Website:
-Documentation are available on [RCD website](https://rcdpackage.com).
-
-## Installation
-The package is available on PyPI and can be installed using pip:
-
-```bash
-pip install rcd
-```
-
-## Basic usage
-The following snipped creates a random directed acyclic graph (DAG) and generates Gaussian data from it. Then, it uses one of the algorithms provided in our package, RSL-D, to learn the skeleton of the DAG from the data. Finally, it compares the learned skeleton to the true skeleton and computes the F1 score based on the edges.
-
-```python
-from rcd import rsl_d
-from rcd.utilities.ci_tests import fisher_z
-from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges
-import networkx as nx
-
-n = 100
-p = n ** (-0.85)
-adj_mat = gen_er_dag_adj_mat(n, p)
-
-# generate data from the DAG
-data_df = gen_gaussian_data(adj_mat, 1000)
-
-# run rsl-D
-ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
-
-learned_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_df)
-
-# compare the learned skeleton to the true skeleton
-true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
-
-# compute F1 score
-precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-print(f'Precision: {precision}, Recall: {recall}, F1 score: {f1_score}')
-```
-
-
 ## License
 
-This project is provided under the BSD license.
-
-```
-BSD 2-Clause License
-
-Copyright (c) 2024, EPFL
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```text
+BSD 2-Clause License © 2024 EPFL
 ```
