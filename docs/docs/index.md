@@ -4,9 +4,11 @@ RCD is the reference implementation of the algorithms introduced in our JMLR pap
 
 ## Why RCD?
 
-- Proven guarantees that match the paper's numbering and notation.
-- Swappable conditional-independence tests—from Fisher-Z to chi-square families.
-- Ready-to-run demos in `examples/` plus reusable utilities for data generation and scoring.
+- **Fast structure learners** – Highly optimized RSL variant that scales to thousands of variables and tens of thousands of samples with ease.
+- **Algorithms for every regime** – Diamond-free, bounded clique number, latent-confounded, and sampling bias settings all covered.
+- **High empirical accuracy** – Out-of-the-box Fisher-Z pipelines deliver strong F1 scores on synthetic benchmarks (see paper).
+- **Theoretical guarantees** – Every implementation mirrors the proofs and pseudocode in the JMLR paper.
+- **Plug-and-play workflows** – Works directly on tabular NumPy arrays or pandas DataFrames with only a CI callable required.
 
 ## Install
 
