@@ -1,14 +1,16 @@
-from rcd import rsl_d
-from rcd import rol_hc
-from rcd.utilities.ci_tests import *
-from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges
+from __future__ import annotations
+
+import networkx as nx
+import numpy as np
+
+from rcd import rol_hc, rsl_d
+from rcd.utilities.ci_tests import get_perfect_ci_test
+from rcd.utilities.data_graph_generation import gen_er_dag_adj_mat, gen_gaussian_data
+from rcd.utilities.utils import f1_score_edges, sanitize_data
 
 
 def test_with_perf_ci():
-    """
-    ROL-HC should do at least as better as RSL-D with perfect CI tests (because it is initialized with RSL-D).
-    """
+    """ROL-HC should never underperform RSL-D when CI oracle is perfect."""
 
     # generate a random Erdos-Renyi DAG
     np.random.seed(2308)
@@ -20,11 +22,9 @@ def test_with_perf_ci():
         adj_mat = gen_er_dag_adj_mat(n, p)
 
         # generate data from the DAG
-        data_df = gen_gaussian_data(adj_mat, 1000)
-        data_mat = data_df.to_numpy()
+        data_mat = sanitize_data(gen_gaussian_data(adj_mat, 1000))
 
         # run rsl-D
-        # ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
         ci_test = get_perfect_ci_test(adj_mat)
         learned_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_mat)
 
@@ -33,22 +33,18 @@ def test_with_perf_ci():
 
         # compute F1 score
         _, _, rsl_f1 = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-        # print(f"RSL-D F1 Score: {rsl_f1}")
 
         # run rol-hc
         learned_skeleton = rol_hc.learn_and_get_skeleton(ci_test, data_mat, 5, 5)
 
         # compute F1 score
         _, _, rol_f1 = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-        # print(f"ROL-HC F1 Score: {rol_f1}")
 
         assert rol_f1 >= rsl_f1, "ROL-HC should have an F1 score at least as good as RSL-D!"
 
 
 def test_with_data():
-    """
-    ROL-HC learned skeleton should ALWAYS have at most as many edges as RSL-D learned skeleton.
-    """
+    """ROL-HC skeletons should not introduce more edges than RSL-D."""
 
     # generate a random Erdos-Renyi DAG
     np.random.seed(2308)
@@ -60,15 +56,15 @@ def test_with_data():
         adj_mat = gen_er_dag_adj_mat(n, p)
 
         # generate data from the DAG
-        data_df = gen_gaussian_data(adj_mat, n*50)
-        data_mat = data_df.to_numpy()
+        data_mat = sanitize_data(gen_gaussian_data(adj_mat, n * 50))
 
         # run rsl-D
-        # ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=1 / n ** 2)
         ci_test = get_perfect_ci_test(adj_mat)
         rsl_skeleton = rsl_d.learn_and_get_skeleton(ci_test, data_mat)
 
         # run rol-hc
         rol_skeleton = rol_hc.learn_and_get_skeleton(ci_test, data_mat, 5, 5)
 
-        assert len(rol_skeleton.edges()) <= len(rsl_skeleton.edges()), "ROL-HC should have at most as many edges as RSL-D!"
+        assert len(rol_skeleton.edges()) <= len(rsl_skeleton.edges()), (
+            "ROL-HC should have at most as many edges as RSL-D!"
+        )

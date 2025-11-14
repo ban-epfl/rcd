@@ -1,13 +1,16 @@
+from __future__ import annotations
+
+import networkx as nx
+import numpy as np
+
 from rcd import rsl_w
-from rcd.utilities.ci_tests import *
-from rcd.utilities.data_graph_generation import *
-from rcd.utilities.utils import f1_score_edges, get_clique_number, compute_mb
+from rcd.utilities.ci_tests import fisher_z, get_perfect_ci_test
+from rcd.utilities.data_graph_generation import gen_er_dag_adj_mat, gen_gaussian_data
+from rcd.utilities.utils import compute_mb, f1_score_edges, get_clique_number, sanitize_data
 
 
 def test_with_data():
-    """
-    Test RSL-W on a single graph with a known clique number with data. We expect it to get a high F1 score.
-    """
+    """RSL-W should recover a bounded-clique graph with high accuracy."""
 
     # generate a random Erdos-Renyi DAG
     np.random.seed(2308)
@@ -23,22 +26,19 @@ def test_with_data():
     data_df = gen_gaussian_data(adj_mat, 10000)
 
     # run rsl-w
-    ci_test = lambda x, y, z, data: fisher_z(x, y, z, data, significance_level=2 / n ** 2)
+    ci_test = lambda x, y, z, d: fisher_z(x, y, z, d, significance_level=2 / n**2)
     learned_skeleton = rsl_w.learn_and_get_skeleton(ci_test, data_df, clique_number)
 
     # compare the learned skeleton to the true skeleton
     true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
 
     # compute F1 score
-    precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
+    _, _, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
     assert f1_score >= 0.95, "F1 score should be larger!"
-    print("RSL-W passed the first test!")
 
 
 def test_with_perfect_ci():
-    """
-    Test RSL-W on 100 random ER graphs with known clique numbers. We expect it to get a perfect F1 score with perfect CI tests.
-    """
+    """Perfect CI oracles should make RSL-W exact across many random graphs."""
     n = 20
     p = 0.3
 
@@ -58,13 +58,17 @@ def test_with_perfect_ci():
 
         # run rsl-W
         ci_test = get_perfect_ci_test(adj_mat)
-        find_markov_boundary_matrix = lambda data: compute_mb(data, ci_test)
-        learned_skeleton = rsl_w.learn_and_get_skeleton(ci_test, data_df, clique_number, find_markov_boundary_matrix)
+        find_markov_boundary_matrix = lambda d: compute_mb(sanitize_data(d), ci_test)
+        learned_skeleton = rsl_w.learn_and_get_skeleton(
+            ci_test,
+            data_df,
+            clique_number,
+            find_markov_boundary_matrix,
+        )
 
         # compare the learned skeleton to the true skeleton
         true_skeleton = nx.from_numpy_array(adj_mat, create_using=nx.Graph)
 
         # compute F1 score
-        precision, recall, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
-        assert f1_score == 1, "F1 score of " + str(f1_score) + " for graph " + str(i) + " should be 1!"
-    print("RSL-W passed the second test!")
+        _, _, f1_score = f1_score_edges(true_skeleton, learned_skeleton, return_only_f1=False)
+        assert f1_score == 1, f"F1 score of {f1_score} for graph {i} should be 1!"
