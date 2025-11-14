@@ -1,111 +1,108 @@
+"""Hill-climbing refinement of removal orders (ROL-HC)."""
+
+from __future__ import annotations
+
 import itertools
-import numpy as np
+from collections.abc import Callable, Set
+from typing import TYPE_CHECKING
+
 import networkx as nx
-from typing import Callable, List, Set
+import numpy as np
 
 from rcd.rsl.rsl_d import _RSLDiamondFree
-from rcd.utilities.utils import *
+from rcd.utilities.utils import compute_mb_gaussian, sanitize_data, update_markov_boundary_matrix
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
+def learn_and_get_skeleton(
+    ci_test: Callable[[int, int, list[int], np.ndarray], bool],
+    data: np.ndarray | "pd.DataFrame",
+    max_iters: int,
+    max_swaps: int,
+    initial_r_order: np.ndarray | None = None,
+    find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] | None = None,
+) -> nx.Graph:
+    """Public helper for the ROL-HC algorithm.
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool],
-                           data,
-                           max_iters: int,
-                           max_swaps: int,
-                           initial_r_order: np.ndarray = None,
-                           find_markov_boundary_matrix_fun=None) -> nx.Graph:
+    Parameters
+    ----------
+    ci_test : Callable[[int, int, list[int], np.ndarray], bool]
+        Conditional independence oracle.
+    data : ndarray or pandas.DataFrame
+        Observational dataset shaped ``(n_samples, n_vars)``.
+    max_iters : int
+        Maximum number of hill-climb iterations.
+    max_swaps : int
+        Maximum swap distance considered per iteration.
+    initial_r_order : np.ndarray, optional
+        Starting removal order. When ``None``, an RSL-D run provides the seed.
+    find_markov_boundary_matrix_fun : Callable[[np.ndarray], np.ndarray], optional
+        Custom Markov-boundary estimator.
+
+    Returns
+    -------
+    nx.Graph
+        Learned skeleton after hill climbing.
     """
-    Learn the skeleton of a causal graph using the ROL hill climbing algorithm.
 
-    Args:
-        ci_test (Callable[[int, int, List[int], np.ndarray], bool]):
-            A conditional independence test function that takes in the indices of two variables
-            and a list of variable indices as the conditioning set, and returns True if the two
-            variables are independent given the conditioning set, and False otherwise.
-        data_matrix (np.ndarray):
-            The data matrix with shape (num_samples, num_vars), where each column corresponds
-            to a variable and each row corresponds to a sample.
-        max_iters (int):
-            Maximum number of iterations to run the algorithm for.
-        max_swaps (int):
-            Maximum swap distance to consider.
-        initial_r_order (np.ndarray, optional):
-            The initial r-order to use. If not provided, the algorithm will use
-            RSL-D to find the initial r-order.
-
-    Returns:
-        nx.Graph: A networkx graph representing the learned skeleton.
-    """
     data_matrix = sanitize_data(data)
-    rol_hc = _ROLHillClimb(ci_test, max_iters, max_swaps, find_markov_boundary_matrix_fun=find_markov_boundary_matrix_fun)
+    rol_hc = _ROLHillClimb(
+        ci_test,
+        max_iters,
+        max_swaps,
+        find_markov_boundary_matrix_fun=find_markov_boundary_matrix_fun,
+    )
     learned_skeleton = rol_hc.learn_and_get_skeleton(data_matrix, initial_r_order)
     return learned_skeleton
 
-REMOVABLE_NOT_FOUND = -1
-
 
 class _ROLHillClimb:
-    """
-    Implementation for the ROL hill climbing algorithm for learning causal graphs.
+    """Hill-climbing refinement of removal orders (JMLR Theorem references apply)."""
 
-    This class is initialized with a conditional independence test function, which determines whether two variables
-    are independent given another set of variables, using the data provided.
-
-    The class has a learn_and_get_skeleton function that takes in a data matrix (numpy array), where each column
-    corresponds to a variable and each row corresponds to a sample, and returns a networkx graph representing the
-    learned skeleton.
-    """
-
-    def __init__(self, ci_test: Callable[[int, int, List[int], np.ndarray], bool],
-                 max_iters: int,
-                 max_swaps: int,
-                 find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] = None):
-        """
-        Initialize the ROL hill climbing algorithm with the conditional independence test to use.
-
-        Args:
-            ci_test (Callable[[int, int, List[int], np.ndarray], bool]):
-                A conditional independence test function that takes in the indices of two variables
-                and a list of variable indices as the conditioning set, and returns True if the two
-                variables are independent given the conditioning set, and False otherwise.
-            max_iters (int):
-                Maximum number of iterations to run the algorithm for.
-            max_swaps (int):
-                Maximum swap distance to consider.
-            find_markov_boundary_matrix_fun (Callable[[np.ndarray], np.ndarray], optional):
-                A function to find the Markov boundary matrix. It takes a numpy array of data,
-                and returns a 2D numpy array. The (i, j)th entry is True if the jth variable is in the
-                Markov boundary of the ith variable, and False otherwise.
-        """
+    def __init__(
+        self,
+        ci_test: Callable[[int, int, list[int], np.ndarray], bool],
+        max_iters: int,
+        max_swaps: int,
+        find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] | None = None,
+    ) -> None:
         if find_markov_boundary_matrix_fun is None:
             self.find_markov_boundary_matrix = compute_mb_gaussian
         else:
             self.find_markov_boundary_matrix = find_markov_boundary_matrix_fun
 
-        self.num_vars = None
-        self.data = None
+        self.num_vars: int | None = None
+        self.data: np.ndarray | None = None
         self.ci_test = ci_test
         self.max_iters = max_iters
         self.max_swaps = max_swaps
 
         # we use a flag array to keep track of which variables need to be checked for removal (i.e., we check if true)
-        self.var_idx_set = None
-        self.learned_skeleton = None
+        self.var_idx_set: np.ndarray | None = None
+        self.learned_skeleton: nx.Graph | None = None
 
-    def learn_and_get_skeleton(self, data: np.ndarray, initial_r_order: np.ndarray = None) -> nx.Graph:
+    def learn_and_get_skeleton(
+        self,
+        data: np.ndarray,
+        initial_r_order: np.ndarray | None = None,
+    ) -> nx.Graph:
+        """Learn the skeleton via hill climbing on removal orders.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data matrix with shape ``(n_samples, n_vars)``.
+        initial_r_order : np.ndarray, optional
+            R-order seed. When omitted, an RSL-D run supplies it.
+
+        Returns
+        -------
+        nx.Graph
+            Learned skeleton.
         """
-        Learn the skeleton of the graph using the ROL hill climbing algorithm.
 
-        Args:
-            data (np.ndarray):
-                The data matrix with shape (num_samples, num_vars).
-            initial_r_order (np.ndarray, optional):
-                The initial r-order to use. If not provided, the algorithm will use
-                RSL-D to find the initial r-order.
-
-        Returns:
-            nx.Graph: A networkx graph representing the learned skeleton.
-        """
         self.num_vars = data.shape[1]
         self.data = data
 
@@ -115,8 +112,11 @@ class _ROLHillClimb:
             # Set r-order by running RSL-D
             rol_init = _RSLDiamondFree(self.ci_test, self.find_markov_boundary_matrix)
             initial_r_order = rol_init.compute_removal_order(self.data)
+        else:
+            initial_r_order = np.asarray(initial_r_order, dtype=int)
+            if initial_r_order.shape != (self.num_vars,):
+                raise ValueError("initial_r_order must have length equal to the number of variables")
 
-        # Find the best r-order and then learn the skeleton using it
         curr_r_order = np.copy(initial_r_order)
         curr_cost_vec = self.compute_cost(curr_r_order, 0, self.num_vars)
         total_swaps_made = 0
@@ -150,17 +150,11 @@ class _ROLHillClimb:
         return self.learned_skeleton
 
     def learn_skeleton_using_r_order(self, r_order: np.ndarray) -> nx.Graph:
-        """
-        Learns the skeleton of the graph using the given r-order.
+        """Build a skeleton based on a fixed removal order."""
 
-        Args:
-            r_order (np.ndarray):
-                The r-order to use for learning the skeleton.
+        if self.num_vars is None or self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            nx.Graph: A networkx graph representing the learned skeleton.
-        """
-        # Initialize graph
         learned_skeleton = nx.Graph()
         learned_skeleton.add_nodes_from(range(self.num_vars))
 
@@ -174,21 +168,17 @@ class _ROLHillClimb:
 
         return learned_skeleton
 
-    def compute_cost(self, r_order: np.ndarray, starting_index: int, ending_index: int) -> np.ndarray:
-        """
-        Compute the cost of the given r-order between the specified starting and ending indices.
+    def compute_cost(
+        self,
+        r_order: np.ndarray,
+        starting_index: int,
+        ending_index: int,
+    ) -> np.ndarray:
+        """Compute the cost contribution of a window of the removal order."""
 
-        Args:
-            r_order (np.ndarray):
-                The r-order to compute the cost of.
-            starting_index (int):
-                The starting index of the r-order to compute the cost of.
-            ending_index (int):
-                The ending index (exclusive) of the r-order to compute the cost of.
+        if self.data is None or self.num_vars is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            np.ndarray: The cost of the given r-order between the specified starting and ending indices.
-        """
         remaining_vars_mkb = sorted(r_order[starting_index:])
         cost_vec = np.zeros(len(r_order))
 
@@ -199,7 +189,7 @@ class _ROLHillClimb:
         markov_boundary = np.zeros((self.num_vars, self.num_vars), dtype=bool)
         markov_boundary[np.ix_(remaining_vars_mkb, remaining_vars_mkb)] = sub_markov_boundary
 
-        data_included_ci_test = lambda x, y, z: self.ci_test(x, y, z, self.data)
+        data_included_ci_test = lambda x, y, z: self.ci_test(x, y, z, self.data)  # noqa: E731
 
         for index in range(starting_index, ending_index):
             removable_var = r_order[index]
@@ -217,16 +207,12 @@ class _ROLHillClimb:
             )
         return cost_vec
 
-    def find_neighborhood(self, var: int, var_mk_bool_arr) -> np.ndarray:
-        """
-        Find the neighborhood of a variable using Proposition 40.
+    def find_neighborhood(self, var: int, var_mk_bool_arr: np.ndarray) -> np.ndarray:
+        """Find the neighborhood of ``var`` via Proposition 40."""
 
-        Args:
-            var (int): The variable whose neighborhood we want to find.
+        if self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            np.ndarray: 1D numpy array containing the variables in the neighborhood.
-        """
         var_mk_arr = np.flatnonzero(var_mk_bool_arr)
         var_mk_set = set(var_mk_arr)
 
@@ -251,18 +237,11 @@ class _ROLHillClimb:
         return neighbor_arr
 
     def find_neighbors(self, var: int, var_mk_bool_arr: np.ndarray) -> np.ndarray:
-        """
-        Find the neighborhood of a variable using Lemma 27.
+        """Find the neighborhood of ``var`` using Lemma 27."""
 
-        Args:
-            var (int):
-                Index of the variable in the data.
-            var_mk_bool_arr (np.ndarray):
-                Markov boundary of the variable.
+        if self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            np.ndarray: 1D numpy array containing the indices of the variables in the neighborhood.
-        """
         var_mk_arr = np.flatnonzero(var_mk_bool_arr)
         var_mk_set = set(var_mk_arr)
 
@@ -278,20 +257,11 @@ class _ROLHillClimb:
         return neighbors
 
     def is_neighbor(self, var: int, var_y: int, var_mk_set: Set[int]) -> bool:
-        """
-        Check if var_y is a neighbor of variable var using Lemma 27.
+        """Check if ``var_y`` is a neighbor of ``var`` using Lemma 27."""
 
-        Args:
-            var (int):
-                Index of the variable.
-            var_y (int):
-                The variable to check.
-            var_mk_set (Set[int]):
-                Set of the variables in the Markov boundary of var.
+        if self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            bool: True if var_y is a neighbor, False otherwise.
-        """
         var_mk_left_list = list(var_mk_set - {var_y})
         # Use Lemma 27 and check all proper subsets of Mb(X) - {Y}
         for cond_set_size in range(len(var_mk_left_list)):
@@ -301,3 +271,4 @@ class _ROLHillClimb:
                     # Y is a co-parent and thus NOT a neighbor
                     return False
         return True
+
