@@ -232,7 +232,10 @@ class _RSLBase:
         var_arr = np.arange(num_vars)
         var_left_mask = np.ones(num_vars, dtype=bool)
 
-        data_included_ci_test = lambda x, y, z: self.ci_test(x, y, z, self.data)  # noqa: E731
+        def data_included_ci_test(x: int, y: int, z: list[int]) -> bool:
+            """Closure that injects ``self.data`` into the CI test signature."""
+
+            return self.ci_test(x, y, z, self.data)
 
         for iter_idx in range(num_vars - 1):
             # only consider variables that are still left and whose removal needs checking

@@ -1,35 +1,55 @@
+"""Latent-variable MARVEL (L-MARVEL) implementation.
+
+This module implements the version of L-MARVEL described in our JMLR paper
+“Recursive Causal Discovery” (Mokhtarian *et al.*, 2025). It reuses the
+notation and theorem numbering from that paper: all references to
+Lemmas/Theorems/Propositions refer to their JMLR counterparts.
+
+The class below exposes a ``learn_and_get_skeleton`` API that accepts either a
+NumPy array or a pandas ``DataFrame`` and returns a NetworkX skeleton.
+"""
+
+from __future__ import annotations
+
 import itertools
-from typing import Set
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Set
 
-from rcd.utilities.utils import *
+import networkx as nx
+import numpy as np
 
-"""
-l_marvel.py contains implementation for the L-MARVEL algorithm for learning causal graphs with latent
-variables. The class is initialized with a conditional independence test function, which determines whether two
-variables are independent given another set of variables, using the data provided. For examples of possible
-conditional independence tests, see utilities/ci_tests.py. For details on how to write a custom CI test function,
-look at the constructor (init function) of the LMarvel class.
+from rcd.utilities.utils import (
+    REMOVABLE_NOT_FOUND,
+    compute_mb_gaussian,
+    sanitize_data,
+    sort_vars_by_mkb_size,
+    update_markov_boundary_matrix,
+)
 
-The class has a learn_and_get_skeleton function that takes in a Pandas DataFrame of data, where the ith column
-contains samples from the ith variable, and returns a networkx graph representing the learned skeleton.
-"""
+if TYPE_CHECKING:
+    import pandas as pd
 
 
-def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], bool], data,
-                           find_markov_boundary_matrix_fun=None) -> nx.Graph:
-    """
-    Learn the skeleton of a causal graph with latent variables using the L-MARVEL algorithm.
+def learn_and_get_skeleton(
+    ci_test: Callable[[int, int, list[int], np.ndarray], bool],
+    data: np.ndarray | "pd.DataFrame",
+    find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] | None = None,
+) -> nx.Graph:
+    """Learn a latent-variable skeleton using L-MARVEL.
 
-    Args:
-        ci_test (Callable[[int, int, List[int], np.ndarray], bool]):
-            A conditional independence test function that takes in the indices of two variables
-            and a list of variable indices as the conditioning set, and returns True if the two
-            variables are independent given the conditioning set, and False otherwise.
-        data_matrix (np.ndarray): The data matrix with shape (num_samples, num_vars), where each column corresponds
-                                  to a variable and each row corresponds to a sample.
+    Parameters
+    ----------
+    ci_test : Callable[[int, int, list[int], np.ndarray], bool]
+        Conditional independence oracle following the project-wide signature.
+    data : ndarray or pandas.DataFrame
+        Observational data shaped ``(n_samples, n_vars)``.
+    find_markov_boundary_matrix_fun : Callable[[np.ndarray], np.ndarray], optional
+        Optional custom Markov-boundary estimator. Defaults to the Gaussian estimator.
 
-    Returns:
-        nx.Graph: A networkx graph representing the learned skeleton.
+    Returns
+    -------
+    nx.Graph
+        Learned undirected skeleton.
     """
 
     data_mat = sanitize_data(data)
@@ -38,70 +58,38 @@ def learn_and_get_skeleton(ci_test: Callable[[int, int, List[int], np.ndarray], 
     return learned_skeleton
 
 
-REMOVABLE_NOT_FOUND = -1
-
 class _LMarvel:
-    """
-    Implementation for the L-MARVEL algorithm for learning causal graphs with latent variables.
+    """Implementation of the L-MARVEL algorithm (JMLR notation applies)."""
 
-    This class is initialized with a conditional independence test function, which determines whether two variables are
-    independent given another set of variables, using the data provided.
-
-    The class has a learn_and_get_skeleton function that takes in a data matrix (numpy array), where each column
-    corresponds to a variable and each row corresponds to a sample, and returns a networkx graph representing the
-    learned skeleton.
-    """
-
-    def __init__(self, ci_test: Callable[[int, int, List[int], np.ndarray], bool], find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] = None):
-        """
-        Initialize the L-MARVEL algorithm with the conditional independence test to use.
-
-        Args:
-            ci_test (Callable[[int, int, List[int], np.ndarray], bool]):
-                A conditional independence test function. It takes the indices of two variables
-                and a list of variable indices as the conditioning set. It returns True if the two
-                variables are independent given the conditioning set, and False otherwise.
-                Signature:
-                    ci_test(var1: int, var2: int, cond_set: List[int], data: np.ndarray) -> bool.
-            find_markov_boundary_matrix_fun (Callable[[np.ndarray], np.ndarray], optional):
-                A function to find the Markov boundary matrix. It takes a numpy array of data
-                and returns a 2D numpy array. The (i, j)th entry is True if the jth variable is in the
-                Markov boundary of the ith variable, and False otherwise.
-                Signature:
-                    find_markov_boundary_matrix_fun(data: np.ndarray) -> np.ndarray.
-        """
+    def __init__(
+        self,
+        ci_test: Callable[[int, int, list[int], np.ndarray], bool],
+        find_markov_boundary_matrix_fun: Callable[[np.ndarray], np.ndarray] | None = None,
+    ) -> None:
         if find_markov_boundary_matrix_fun is None:
             self.find_markov_boundary_matrix = compute_mb_gaussian
         else:
             self.find_markov_boundary_matrix = find_markov_boundary_matrix_fun
 
-        self.num_vars = None
-        self.data = None
+        self.num_vars: int | None = None
+        self.data: np.ndarray | None = None
         self.ci_test = ci_test
 
         # we use a flag array to keep track of which variables need to be checked for removal (i.e., we check if False)
-        self.skip_rem_check_vec = None  # SkipCheck_VEC in the paper
+        self.skip_rem_check_vec: np.ndarray | None = None  # SkipCheck_VEC in the paper
 
         # we use a set to keep track of which Y and Z pairs have been checked for a given X (see IsRemovable in the paper)
-        self.skip_rem_check_set = None  # SkipCheck_MAT in the paper
+        self.skip_rem_check_set: Set[tuple[int, int, int]] | None = None  # SkipCheck_MAT in the paper
 
         # we use a flag array to keep track of which variables' neighbors need to be learned (i.e., we learn if False)
-        self.neighbor_learned_arr = None
-        self.var_idx_set = None
-        self.markov_boundary_matrix = None
-        self.learned_skeleton = None
+        self.neighbor_learned_arr: np.ndarray | None = None
+        self.var_idx_set: set[int] | None = None
+        self.markov_boundary_matrix: np.ndarray | None = None
+        self.learned_skeleton: nx.Graph | None = None
 
     def learn_and_get_skeleton(self, data: np.ndarray) -> nx.Graph:
-        """
-        Run the L-MARVEL algorithm on the data to learn and return the learned skeleton graph.
+        """Execute L-MARVEL on ``data`` and return the learned skeleton."""
 
-        Args:
-            data (np.ndarray): The data matrix with shape (num_samples, num_vars).
-
-        Returns:
-            nx.Graph: A networkx graph representing the learned skeleton.
-        """
-        # Initialize algorithm state
         self.num_vars = data.shape[1]
         self.data = data
 
@@ -113,7 +101,8 @@ class _LMarvel:
         self.learned_skeleton = nx.Graph()
         self.learned_skeleton.add_nodes_from(range(self.num_vars))
 
-        data_included_ci_test = lambda x, y, z: self.ci_test(x, y, z, self.data)
+        def data_included_ci_test(x: int, y: int, z: list[int]) -> bool:
+            return self.ci_test(x, y, z, self.data)
 
         var_arr = np.arange(self.num_vars)
         var_left_bool_arr = np.ones(self.num_vars, dtype=bool)  # Indicates if variable is left
@@ -123,7 +112,10 @@ class _LMarvel:
             # only sort variables that are still left and whose removability has NOT been checked
             var_to_sort_bool_arr = var_left_bool_arr & ~self.skip_rem_check_vec
             var_to_sort_arr = var_arr[var_to_sort_bool_arr]
-            sorted_var_arr = sort_vars_by_mkb_size(self.markov_boundary_matrix[var_to_sort_bool_arr], var_to_sort_arr)
+            sorted_var_arr = sort_vars_by_mkb_size(
+                self.markov_boundary_matrix[var_to_sort_bool_arr],
+                var_to_sort_arr,
+            )
 
             removable_var = REMOVABLE_NOT_FOUND
             for var in sorted_var_arr:
@@ -143,7 +135,7 @@ class _LMarvel:
                     neighbors = [neighbor for neighbor in neighbors if var_left_bool_arr[neighbor]]
 
                 # Check if variable is removable
-                if self.is_removable(var, neighbors):
+                if self.is_removable(var, np.asarray(neighbors, dtype=int)):
                     removable_var = var
                     break
                 else:
@@ -161,7 +153,11 @@ class _LMarvel:
                 var_left_bool_arr[removable_var] = False
 
             # Make sure to only include neighbors that are still left
-            neighbors = [neighbor for neighbor in self.learned_skeleton.neighbors(removable_var) if var_left_bool_arr[neighbor]]
+            neighbors = [
+                neighbor
+                for neighbor in self.learned_skeleton.neighbors(removable_var)
+                if var_left_bool_arr[neighbor]
+            ]
 
             # Update the Markov boundary matrix
             update_markov_boundary_matrix(
@@ -175,15 +171,11 @@ class _LMarvel:
         return self.learned_skeleton
 
     def find_neighborhood(self, var: int) -> np.ndarray:
-        """
-        Find the neighborhood of a variable using Lemma 27.
+        """Find the neighborhood of ``var`` using Lemma 27."""
 
-        Args:
-            var (int): The variable whose neighborhood we want to find.
+        if self.markov_boundary_matrix is None or self.learned_skeleton is None or self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            np.ndarray: 1D numpy array containing the variables in the neighborhood.
-        """
         var_mk_bool_arr = self.markov_boundary_matrix[var]
         var_mk_arr = np.flatnonzero(var_mk_bool_arr)
         var_mk_set = set(var_mk_arr)
@@ -201,17 +193,11 @@ class _LMarvel:
         return neighbors
 
     def is_neighbor(self, var: int, var_y: int, var_mk_set: Set[int]) -> bool:
-        """
-        Check if var_y is a neighbor of variable var using Lemma 27.
+        """Check if ``var_y`` is a neighbor of ``var`` using Lemma 27."""
 
-        Args:
-            var (int): Index of the variable.
-            var_y (int): The variable to check.
-            var_mk_set (Set[int]): Set of the variables in the Markov boundary of var.
+        if self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            bool: True if var_y is a neighbor, False otherwise.
-        """
         var_mk_left_list = list(var_mk_set - {var_y})
         # Use Lemma 27 and check all proper subsets of Mb(X) - {Y}
         for cond_set_size in range(len(var_mk_left_list) + 1):
@@ -223,21 +209,16 @@ class _LMarvel:
         return True
 
     def is_removable(self, var: int, neighbors: np.ndarray) -> bool:
-        """
-        Check whether a variable is removable using Theorem 32.
+        """Check whether ``var`` is removable using Theorem 32."""
 
-        Args:
-            var (int): Index of the variable.
-            neighbors (np.ndarray): Neighbors of the variable.
+        if self.markov_boundary_matrix is None or self.skip_rem_check_set is None or self.data is None:
+            raise RuntimeError("Learning state has not been initialized.")
 
-        Returns:
-            bool: True if the variable is removable, False otherwise.
-        """
         var_mk_bool_arr = self.markov_boundary_matrix[var]
         var_mk_arr = np.flatnonzero(var_mk_bool_arr)
         var_mk_set = set(var_mk_arr)
 
-        def cond_1(var_y, var_z):
+        def cond_1(var_y: int, var_z: int) -> bool:
             # there exists subset W in Mb(X) - {Y, Z}, s.t. Y ind. Z | W
             var_mk_left_list = list(var_mk_set - {var_y, var_z})
             for cond_set_size in range(len(var_mk_left_list) + 1):
@@ -247,7 +228,7 @@ class _LMarvel:
                         return True
             return False
 
-        def cond_2(var_y, var_z):
+        def cond_2(var_y: int, var_z: int) -> bool:
             # for all subset W in Mb(X) - {Y, Z}, s.t. Y NOT ind. Z | W + {X}
             var_mk_left_left = list(var_mk_set - {var_y, var_z})
             for cond_set_size in range(len(var_mk_left_left) + 1):

@@ -1,4 +1,9 @@
-"""Recursive Skeleton Learning for bounded-clique graphs (RSL-W)."""
+"""Recursive Skeleton Learning for bounded-clique graphs (RSL-W).
+
+Implements the bounded clique-number variant of RSL as defined in our JMLR
+paper “Recursive Causal Discovery,” using the paper’s consolidated
+notation/theorem numbering.
+"""
 
 from __future__ import annotations
 
@@ -131,4 +136,3 @@ class _RSLBoundedClique(_RSLBase):
                         if self.ci_test(var_y, var_z, cond_set, self.data):
                             return False
         return True
-

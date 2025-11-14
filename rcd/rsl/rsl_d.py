@@ -1,4 +1,9 @@
-"""Recursive Skeleton Learning for diamond-free graphs (RSL-D)."""
+"""Recursive Skeleton Learning for diamond-free graphs (RSL-D).
+
+Implements the diamond-free branch of the Recursive Skeleton Learning
+algorithms introduced in our JMLR paper “Recursive Causal Discovery.” All
+references to propositions or lemmas align with that paper’s numbering.
+"""
 
 from __future__ import annotations
 
@@ -139,4 +144,3 @@ class _RSLDiamondFree(_RSLBase):
                 if self.ci_test(var_y, var_z, cond_set, self.data):
                     return False
         return True
-

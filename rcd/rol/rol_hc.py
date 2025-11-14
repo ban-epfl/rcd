@@ -1,4 +1,8 @@
-"""Hill-climbing refinement of removal orders (ROL-HC)."""
+"""Hill-climbing refinement of removal orders (ROL-HC).
+
+Implements the ROL-HC routine from our JMLR paper “Recursive Causal
+Discovery.” All theorem/lemma citations refer to that paper’s numbering.
+"""
 
 from __future__ import annotations
 
@@ -189,7 +193,8 @@ class _ROLHillClimb:
         markov_boundary = np.zeros((self.num_vars, self.num_vars), dtype=bool)
         markov_boundary[np.ix_(remaining_vars_mkb, remaining_vars_mkb)] = sub_markov_boundary
 
-        data_included_ci_test = lambda x, y, z: self.ci_test(x, y, z, self.data)  # noqa: E731
+        def data_included_ci_test(x: int, y: int, z: list[int]) -> bool:
+            return self.ci_test(x, y, z, self.data)
 
         for index in range(starting_index, ending_index):
             removable_var = r_order[index]
@@ -271,4 +276,3 @@ class _ROLHillClimb:
                     # Y is a co-parent and thus NOT a neighbor
                     return False
         return True
-
