@@ -30,13 +30,13 @@ RCD is a batteries-included Python toolkit for learning causal skeletons from ob
 
 ## Algorithms inside
 
-| Module | Problem Setting | Notes |
-| --- | --- | --- |
-| `rcd.rsl.rsl_d` | Diamond-free graphs (RSL-D) | Recursive removal with Fisher-Z CI tests by default. |
+| Module | Problem Setting | Notes                                                                |
+| --- | --- |----------------------------------------------------------------------|
+| `rcd.rsl.rsl_d` | Diamond-free graphs (RSL-D) | Recursive removal for diamond-free graphs. Very fast.                |
 | `rcd.rsl.rsl_w` | Graphs with bounded clique number (RSL-W) | Requires clique-number upper bound; handles dense Markov boundaries. |
-| `rcd.l_marvel` | Latent MARVEL | Learns skeletons when latent confounders are present. |
-| `rcd.marvel` | MARVEL | Handles mixed observable/latent structures via v-structure reasoning. |
-| `rcd.rol.rol_hc` | Removal-order hill climbing (ROL-HC) | Warm-started by RSL-D and improves the ordering via local swaps. |
+| `rcd.l_marvel` | Latent MARVEL | Learns skeletons when latent confounders are present.                |
+| `rcd.marvel` | MARVEL | No assumption on structure of graph. Runs slow.                      |
+| `rcd.rol.rol_hc` | Removal-order hill climbing (ROL-HC) | Warm-started by RSL-D and improves the ordering via local swaps.     |
 
 Every algorithm exposes the same high-level API:
 
